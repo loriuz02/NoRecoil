@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/NoRecoil.Core/NoRecoil.Core.csproj" />
+    <Project Path="src/NoRecoil.Desktop/NoRecoil.Desktop.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/NoRecoil.Core.Tests/NoRecoil.Core.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,15 @@
+# .NET
+bin/
+obj/
+
+# User-specific
+*.user
+*.suo
+
+# Android / IntelliJ
+.gradle/
+.idea/
+local.properties
+
+# Misc
+.DS_Store

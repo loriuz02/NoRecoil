@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Paired desktop device" />
+
+        <Spinner
+            android:id="@+id/deviceSpinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <Button
+            android:id="@+id/connectButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Connect" />
+
+        <TextView
+            android:id="@+id/statusLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Disconnected" />
+
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:text="Right" />
+        <SeekBar android:id="@+id/rightSeek" android:layout_width="match_parent" android:layout_height="wrap_content" android:max="100" />
+
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Down" />
+        <SeekBar android:id="@+id/downSeek" android:layout_width="match_parent" android:layout_height="wrap_content" android:max="100" />
+
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Left" />
+        <SeekBar android:id="@+id/leftSeek" android:layout_width="match_parent" android:layout_height="wrap_content" android:max="100" />
+
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Up" />
+        <SeekBar android:id="@+id/upSeek" android:layout_width="match_parent" android:layout_height="wrap_content" android:max="100" />
+
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Delay" />
+        <SeekBar android:id="@+id/delaySeek" android:layout_width="match_parent" android:layout_height="wrap_content" android:max="200" />
+
+        <Button
+            android:id="@+id/sendButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Send preset" />
+    </LinearLayout>
+
+</ScrollView>
