@@ -46,6 +46,26 @@ public class PresetIniSerializerTests
     }
 
     [Fact]
+    public void Parse_ReadsAliasAndColonBasedKeys()
+    {
+        const string input = """
+            ﻿R:9
+            DownValue=14
+            L=2
+            U=1
+            Delay=3
+            """;
+
+        var preset = PresetIniSerializer.Parse(input);
+
+        Assert.Equal(9, preset.Right);
+        Assert.Equal(14, preset.Down);
+        Assert.Equal(2, preset.Left);
+        Assert.Equal(1, preset.Up);
+        Assert.Equal(3, preset.Delay);
+    }
+
+    [Fact]
     public void Serialize_WritesRecoilSectionWhenEnabled()
     {
         var preset = new RecoilPreset

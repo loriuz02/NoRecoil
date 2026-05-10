@@ -47,7 +47,8 @@ partial class Form1
         saveButton = new Button();
         loadButton = new Button();
         toggleRecoilButton = new Button();
-        disableRecoilButton = new Button();
+        setEnableHotkeyButton = new Button();
+        setDisableHotkeyButton = new Button();
         requireRightMouseCheckbox = new CheckBox();
         statusLabel = new Label();
         statusValueLabel = new Label();
@@ -230,23 +231,33 @@ partial class Form1
         toggleRecoilButton.UseVisualStyleBackColor = true;
         toggleRecoilButton.Click += toggleRecoilButton_Click;
         // 
-        // disableRecoilButton
+        // setEnableHotkeyButton
         // 
-        disableRecoilButton.Location = new Point(210, 318);
-        disableRecoilButton.Name = "disableRecoilButton";
-        disableRecoilButton.Size = new Size(117, 32);
-        disableRecoilButton.TabIndex = 18;
-        disableRecoilButton.Text = "Disable recoil";
-        disableRecoilButton.UseVisualStyleBackColor = true;
-        disableRecoilButton.Click += disableRecoilButton_Click;
+        setEnableHotkeyButton.Location = new Point(210, 318);
+        setEnableHotkeyButton.Name = "setEnableHotkeyButton";
+        setEnableHotkeyButton.Size = new Size(150, 32);
+        setEnableHotkeyButton.TabIndex = 18;
+        setEnableHotkeyButton.Text = "Set enable key (F1)";
+        setEnableHotkeyButton.UseVisualStyleBackColor = true;
+        setEnableHotkeyButton.Click += setEnableHotkeyButton_Click;
+        // 
+        // setDisableHotkeyButton
+        // 
+        setDisableHotkeyButton.Location = new Point(20, 356);
+        setDisableHotkeyButton.Name = "setDisableHotkeyButton";
+        setDisableHotkeyButton.Size = new Size(180, 32);
+        setDisableHotkeyButton.TabIndex = 19;
+        setDisableHotkeyButton.Text = "Set disable key (F2)";
+        setDisableHotkeyButton.UseVisualStyleBackColor = true;
+        setDisableHotkeyButton.Click += setDisableHotkeyButton_Click;
         // 
         // requireRightMouseCheckbox
         // 
         requireRightMouseCheckbox.AutoSize = true;
-        requireRightMouseCheckbox.Location = new Point(20, 358);
+        requireRightMouseCheckbox.Location = new Point(210, 360);
         requireRightMouseCheckbox.Name = "requireRightMouseCheckbox";
-        requireRightMouseCheckbox.Size = new Size(291, 24);
-        requireRightMouseCheckbox.TabIndex = 19;
+        requireRightMouseCheckbox.Size = new Size(284, 24);
+        requireRightMouseCheckbox.TabIndex = 20;
         requireRightMouseCheckbox.Text = "Require right mouse together with left";
         requireRightMouseCheckbox.UseVisualStyleBackColor = true;
         requireRightMouseCheckbox.CheckedChanged += requireRightMouseCheckbox_CheckedChanged;
@@ -254,19 +265,19 @@ partial class Form1
         // statusLabel
         // 
         statusLabel.AutoSize = true;
-        statusLabel.Location = new Point(333, 324);
+        statusLabel.Location = new Point(367, 324);
         statusLabel.Name = "statusLabel";
         statusLabel.Size = new Size(49, 20);
-        statusLabel.TabIndex = 20;
+        statusLabel.TabIndex = 21;
         statusLabel.Text = "Status:";
         // 
         // statusValueLabel
         // 
         statusValueLabel.AutoSize = true;
-        statusValueLabel.Location = new Point(388, 324);
+        statusValueLabel.Location = new Point(422, 324);
         statusValueLabel.Name = "statusValueLabel";
         statusValueLabel.Size = new Size(69, 20);
-        statusValueLabel.TabIndex = 21;
+        statusValueLabel.TabIndex = 22;
         statusValueLabel.Text = "Disabled";
         // 
         // pathLabel
@@ -275,7 +286,7 @@ partial class Form1
         pathLabel.Location = new Point(20, 389);
         pathLabel.Name = "pathLabel";
         pathLabel.Size = new Size(69, 20);
-        pathLabel.TabIndex = 22;
+        pathLabel.TabIndex = 23;
         pathLabel.Text = "Last path:";
         // 
         // pathValueLabel
@@ -284,7 +295,7 @@ partial class Form1
         pathValueLabel.Location = new Point(95, 389);
         pathValueLabel.Name = "pathValueLabel";
         pathValueLabel.Size = new Size(343, 20);
-        pathValueLabel.TabIndex = 23;
+        pathValueLabel.TabIndex = 24;
         pathValueLabel.Text = "-";
         // 
         // bluetoothPortLabel
@@ -293,7 +304,7 @@ partial class Form1
         bluetoothPortLabel.Location = new Point(20, 423);
         bluetoothPortLabel.Name = "bluetoothPortLabel";
         bluetoothPortLabel.Size = new Size(105, 20);
-        bluetoothPortLabel.TabIndex = 24;
+        bluetoothPortLabel.TabIndex = 25;
         bluetoothPortLabel.Text = "Bluetooth COM";
         // 
         // bluetoothPortTextbox
@@ -302,7 +313,7 @@ partial class Form1
         bluetoothPortTextbox.Name = "bluetoothPortTextbox";
         bluetoothPortTextbox.PlaceholderText = "COM5";
         bluetoothPortTextbox.Size = new Size(99, 27);
-        bluetoothPortTextbox.TabIndex = 25;
+        bluetoothPortTextbox.TabIndex = 26;
         bluetoothPortTextbox.TextChanged += bluetoothPortTextbox_TextChanged;
         // 
         // connectBluetoothButton
@@ -310,7 +321,7 @@ partial class Form1
         connectBluetoothButton.Location = new Point(238, 418);
         connectBluetoothButton.Name = "connectBluetoothButton";
         connectBluetoothButton.Size = new Size(95, 31);
-        connectBluetoothButton.TabIndex = 26;
+        connectBluetoothButton.TabIndex = 27;
         connectBluetoothButton.Text = "Connect";
         connectBluetoothButton.UseVisualStyleBackColor = true;
         connectBluetoothButton.Click += connectBluetoothButton_Click;
@@ -321,7 +332,7 @@ partial class Form1
         bluetoothStatusLabel.Location = new Point(340, 423);
         bluetoothStatusLabel.Name = "bluetoothStatusLabel";
         bluetoothStatusLabel.Size = new Size(52, 20);
-        bluetoothStatusLabel.TabIndex = 27;
+        bluetoothStatusLabel.TabIndex = 28;
         bluetoothStatusLabel.Text = "BT sta:";
         // 
         // bluetoothStatusValueLabel
@@ -330,7 +341,7 @@ partial class Form1
         bluetoothStatusValueLabel.Location = new Point(397, 423);
         bluetoothStatusValueLabel.Name = "bluetoothStatusValueLabel";
         bluetoothStatusValueLabel.Size = new Size(97, 20);
-        bluetoothStatusValueLabel.TabIndex = 28;
+        bluetoothStatusValueLabel.TabIndex = 29;
         bluetoothStatusValueLabel.Text = "Disconnected";
         // 
         // Form1
@@ -348,7 +359,8 @@ partial class Form1
         Controls.Add(statusValueLabel);
         Controls.Add(statusLabel);
         Controls.Add(requireRightMouseCheckbox);
-        Controls.Add(disableRecoilButton);
+        Controls.Add(setDisableHotkeyButton);
+        Controls.Add(setEnableHotkeyButton);
         Controls.Add(toggleRecoilButton);
         Controls.Add(loadButton);
         Controls.Add(saveButton);
@@ -368,9 +380,11 @@ partial class Form1
         Controls.Add(downSlider);
         Controls.Add(rightSlider);
         FormBorderStyle = FormBorderStyle.FixedDialog;
+        KeyPreview = true;
         MaximizeBox = false;
         Name = "Form1";
         Text = "NoRecoil Preset Controller";
+        KeyDown += Form1_KeyDown;
         ((System.ComponentModel.ISupportInitialize)rightSlider).EndInit();
         ((System.ComponentModel.ISupportInitialize)downSlider).EndInit();
         ((System.ComponentModel.ISupportInitialize)leftSlider).EndInit();
@@ -400,7 +414,8 @@ partial class Form1
     private Button saveButton;
     private Button loadButton;
     private Button toggleRecoilButton;
-    private Button disableRecoilButton;
+    private Button setEnableHotkeyButton;
+    private Button setDisableHotkeyButton;
     private CheckBox requireRightMouseCheckbox;
     private Label statusLabel;
     private Label statusValueLabel;

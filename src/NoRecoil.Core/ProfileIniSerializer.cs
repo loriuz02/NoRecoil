@@ -21,6 +21,8 @@ public static class ProfileIniSerializer
             ["RecoilEnabled"] = "false",
             ["RequireRightMouseButton"] = "true",
             ["BluetoothPort"] = string.Empty,
+            ["EnableHotkey"] = ProfileSettings.DefaultEnableHotkey.ToString(CultureInfo.InvariantCulture),
+            ["DisableHotkey"] = ProfileSettings.DefaultDisableHotkey.ToString(CultureInfo.InvariantCulture),
         };
 
         foreach (var rawLine in content.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
@@ -59,6 +61,8 @@ public static class ProfileIniSerializer
             RecoilEnabled = ParseBoolOrDefault(values["RecoilEnabled"], defaultValue: false),
             RequireRightMouseButton = ParseBoolOrDefault(values["RequireRightMouseButton"], defaultValue: true),
             BluetoothPort = values["BluetoothPort"],
+            EnableHotkey = ParseIntOrDefault(values["EnableHotkey"]),
+            DisableHotkey = ParseIntOrDefault(values["DisableHotkey"]),
         };
     }
 
@@ -81,6 +85,8 @@ public static class ProfileIniSerializer
         output.AppendLine($"RecoilEnabled={settings.RecoilEnabled}");
         output.AppendLine($"RequireRightMouseButton={settings.RequireRightMouseButton}");
         output.AppendLine($"BluetoothPort={settings.BluetoothPort}");
+        output.AppendLine($"EnableHotkey={settings.EnableHotkey}");
+        output.AppendLine($"DisableHotkey={settings.DisableHotkey}");
 
         return output.ToString();
     }

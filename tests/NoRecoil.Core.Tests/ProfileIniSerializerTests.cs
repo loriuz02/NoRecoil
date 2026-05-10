@@ -17,6 +17,8 @@ public class ProfileIniSerializerTests
             RecoilEnabled=true
             RequireRightMouseButton=false
             BluetoothPort=COM5
+            EnableHotkey=116
+            DisableHotkey=117
             """;
 
         var settings = ProfileIniSerializer.Parse(input);
@@ -29,6 +31,8 @@ public class ProfileIniSerializerTests
         Assert.True(settings.RecoilEnabled);
         Assert.False(settings.RequireRightMouseButton);
         Assert.Equal("COM5", settings.BluetoothPort);
+        Assert.Equal(116, settings.EnableHotkey);
+        Assert.Equal(117, settings.DisableHotkey);
     }
 
     [Fact]
@@ -46,6 +50,8 @@ public class ProfileIniSerializerTests
         Assert.False(settings.RecoilEnabled);
         Assert.True(settings.RequireRightMouseButton);
         Assert.Equal(string.Empty, settings.BluetoothPort);
+        Assert.Equal(ProfileSettings.DefaultEnableHotkey, settings.EnableHotkey);
+        Assert.Equal(ProfileSettings.DefaultDisableHotkey, settings.DisableHotkey);
     }
 
     [Fact]
@@ -64,6 +70,8 @@ public class ProfileIniSerializerTests
             RecoilEnabled = true,
             RequireRightMouseButton = true,
             BluetoothPort = "COM7",
+            EnableHotkey = 114,
+            DisableHotkey = 115,
         };
 
         var ini = ProfileIniSerializer.Serialize(settings, includeSectionHeader: true);
@@ -77,5 +85,7 @@ public class ProfileIniSerializerTests
         Assert.Contains("RecoilEnabled=True", ini);
         Assert.Contains("RequireRightMouseButton=True", ini);
         Assert.Contains("BluetoothPort=COM7", ini);
+        Assert.Contains("EnableHotkey=114", ini);
+        Assert.Contains("DisableHotkey=115", ini);
     }
 }

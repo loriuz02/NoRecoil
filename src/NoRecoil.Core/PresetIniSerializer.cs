@@ -6,6 +6,17 @@ namespace NoRecoil.Core;
 public static class PresetIniSerializer
 {
     private static readonly StringComparer KeyComparer = StringComparer.OrdinalIgnoreCase;
+    private static readonly IReadOnlyDictionary<string, string> KeyAliases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["R"] = "Right",
+        ["L"] = "Left",
+        ["D"] = "Down",
+        ["U"] = "Up",
+        ["RightValue"] = "Right",
+        ["LeftValue"] = "Left",
+        ["DownValue"] = "Down",
+        ["UpValue"] = "Up",
+    };
 
     public static RecoilPreset Parse(string content)
     {
@@ -28,13 +39,18 @@ public static class PresetIniSerializer
             }
 
             var separator = rawLine.IndexOf('=');
+            if (separator <= 0)
+            {
+                separator = rawLine.IndexOf(':');
+            }
+
             if (separator <= 0 || separator == rawLine.Length - 1)
             {
                 continue;
             }
 
-            var key = rawLine[..separator].Trim();
-            if (!values.ContainsKey(key))
+            var key = ResolveKey(rawLine[..separator].Trim());
+            if (key is null || !values.ContainsKey(key))
             {
                 continue;
             }
@@ -88,5 +104,21 @@ public static class PresetIniSerializer
         ArgumentNullException.ThrowIfNull(preset);
 
         File.WriteAllText(path, Serialize(preset, includeSectionHeader));
+    }
+
+    private static string? ResolveKey(string rawKey)
+    {
+        if (string.IsNullOrWhiteSpace(rawKey))
+        {
+            return null;
+        }
+
+        var key = rawKey.Trim().TrimStart('\uFEFF');
+        if (KeyAliases.TryGetValue(key, out var alias))
+        {
+            return alias;
+        }
+
+        return key;
     }
 }
