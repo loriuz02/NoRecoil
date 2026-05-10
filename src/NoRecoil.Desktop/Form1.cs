@@ -8,9 +8,11 @@ namespace NoRecoil.Desktop;
 public partial class Form1 : Form
 {
     private readonly LastPathCache _lastPathCache = new();
+    private readonly string _profilePath = Path.Combine(AppContext.BaseDirectory, "profile.ini");
     private readonly System.Windows.Forms.Timer _recoilTimer = new();
     private readonly StringBuilder _bluetoothBuffer = new();
     private SerialPort? _serialPort;
+    private bool _applyingProfile;
 
     public Form1()
     {
@@ -20,6 +22,11 @@ public partial class Form1 : Form
         _recoilTimer.Tick += RecoilTimerOnTick;
 
         ApplyPreset(new RecoilPreset());
+        ApplyRecoilState(false);
+        requireRightMouseCheckbox.Checked = true;
+
+        LoadProfile();
+
         var lastPath = _lastPathCache.Load();
         if (!string.IsNullOrWhiteSpace(lastPath) && File.Exists(lastPath))
         {
@@ -30,10 +37,26 @@ public partial class Form1 : Form
         UpdateDelayLabel();
     }
 
-    private void recoilEnabledCheckbox_CheckedChanged(object sender, EventArgs e)
+    private void toggleRecoilButton_Click(object sender, EventArgs e)
     {
-        _recoilTimer.Enabled = recoilEnabledCheckbox.Checked;
-        statusValueLabel.Text = _recoilTimer.Enabled ? "Enabled" : "Disabled";
+        ApplyRecoilState(!_recoilTimer.Enabled);
+        SaveProfile();
+    }
+
+    private void disableRecoilButton_Click(object sender, EventArgs e)
+    {
+        ApplyRecoilState(false);
+        SaveProfile();
+    }
+
+    private void requireRightMouseCheckbox_CheckedChanged(object sender, EventArgs e)
+    {
+        SaveProfile();
+    }
+
+    private void bluetoothPortTextbox_TextChanged(object sender, EventArgs e)
+    {
+        SaveProfile();
     }
 
     private void slider_ValueChanged(object sender, EventArgs e)
@@ -45,6 +68,7 @@ public partial class Form1 : Form
         UpdateDelayLabel();
 
         TrySendPresetToBluetooth();
+        SaveProfile();
     }
 
     private void saveButton_Click(object sender, EventArgs e)
@@ -66,6 +90,7 @@ public partial class Form1 : Form
         PresetIniSerializer.SaveToFile(dialog.FileName, BuildPreset(), includeSectionHeader: true);
         _lastPathCache.Save(dialog.FileName);
         pathValueLabel.Text = dialog.FileName;
+        SaveProfile();
     }
 
     private void loadButton_Click(object sender, EventArgs e)
@@ -91,6 +116,7 @@ public partial class Form1 : Form
         pathValueLabel.Text = dialog.FileName;
 
         TrySendPresetToBluetooth();
+        SaveProfile();
     }
 
     private void connectBluetoothButton_Click(object sender, EventArgs e)
@@ -121,6 +147,7 @@ public partial class Form1 : Form
             connectBluetoothButton.Text = "Disconnect";
 
             TrySendPresetToBluetooth();
+            SaveProfile();
         }
         catch (Exception ex)
         {
@@ -132,6 +159,11 @@ public partial class Form1 : Form
     private void RecoilTimerOnTick(object? sender, EventArgs e)
     {
         if ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) == 0)
+        {
+            return;
+        }
+
+        if (requireRightMouseCheckbox.Checked && (GetAsyncKeyState(VK_RBUTTON) & 0x8000) == 0)
         {
             return;
         }
@@ -192,6 +224,72 @@ public partial class Form1 : Form
     private void UpdateDelayLabel()
     {
         delayValueLabel.Text = $"{delaySlider.Value} ms";
+    }
+
+    private void ApplyRecoilState(bool enabled)
+    {
+        _recoilTimer.Enabled = enabled;
+        statusValueLabel.Text = enabled ? "Enabled" : "Disabled";
+        toggleRecoilButton.Text = enabled ? "Toggle recoil (disable)" : "Toggle recoil (enable)";
+    }
+
+    private ProfileSettings BuildProfileSettings() => new()
+    {
+        Preset = BuildPreset(),
+        RecoilEnabled = _recoilTimer.Enabled,
+        RequireRightMouseButton = requireRightMouseCheckbox.Checked,
+        BluetoothPort = bluetoothPortTextbox.Text.Trim(),
+    };
+
+    private void ApplyProfileSettings(ProfileSettings settings)
+    {
+        _applyingProfile = true;
+        try
+        {
+            ApplyPreset(settings.Preset);
+            ApplyRecoilState(settings.RecoilEnabled);
+            requireRightMouseCheckbox.Checked = settings.RequireRightMouseButton;
+            bluetoothPortTextbox.Text = settings.BluetoothPort;
+        }
+        finally
+        {
+            _applyingProfile = false;
+        }
+    }
+
+    private void LoadProfile()
+    {
+        try
+        {
+            if (!File.Exists(_profilePath))
+            {
+                SaveProfile();
+                return;
+            }
+
+            ApplyProfileSettings(ProfileIniSerializer.LoadFromFile(_profilePath));
+        }
+        catch
+        {
+            SaveProfile();
+        }
+    }
+
+    private void SaveProfile()
+    {
+        if (_applyingProfile)
+        {
+            return;
+        }
+
+        try
+        {
+            ProfileIniSerializer.SaveToFile(_profilePath, BuildProfileSettings(), includeSectionHeader: true);
+        }
+        catch
+        {
+            // ignored: profile persistence should not break runtime behavior
+        }
     }
 
     private void SerialPortOnDataReceived(object sender, SerialDataReceivedEventArgs e)
@@ -297,6 +395,7 @@ public partial class Form1 : Form
 
         connectBluetoothButton.Text = "Connect";
         bluetoothStatusValueLabel.Text = "Disconnected";
+        SaveProfile();
     }
 
     protected override void OnFormClosing(FormClosingEventArgs e)
@@ -307,6 +406,7 @@ public partial class Form1 : Form
 
     private const uint MOUSEEVENTF_MOVE = 0x0001;
     private const int VK_LBUTTON = 0x01;
+    private const int VK_RBUTTON = 0x02;
 
     [DllImport("user32.dll")]
     private static extern short GetAsyncKeyState(int vKey);
