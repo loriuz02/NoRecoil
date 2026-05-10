@@ -113,7 +113,7 @@ public static class PresetIniSerializer
             return null;
         }
 
-        var key = rawKey.Trim().TrimStart('\uFEFF'); // Remove UTF BOM when present at file start.
+        var key = rawKey.TrimStart('\uFEFF'); // Remove UTF BOM when present at file start.
         if (KeyAliases.TryGetValue(key, out var alias))
         {
             return alias;

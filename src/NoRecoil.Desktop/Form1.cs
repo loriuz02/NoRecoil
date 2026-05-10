@@ -484,7 +484,7 @@ public partial class Form1 : Form
     private const int VK_LBUTTON = 0x01;
     private const int VK_RBUTTON = 0x02;
     private const int MinSupportedVirtualKey = 0x01; // Lowest Windows virtual-key code used by GetAsyncKeyState.
-    private const int MaxSupportedVirtualKey = 0xFE; // Highest standard Windows virtual-key code (0xFF is reserved).
+    private const int MaxSupportedVirtualKey = 0xFE; // Upper bound supported here; 0xFE (VK_PACKET) and 0xFF have special meanings.
 
     [DllImport("user32.dll")]
     private static extern short GetAsyncKeyState(int vKey);
@@ -510,21 +510,21 @@ public partial class Form1 : Form
             : $"Set disable key ({FormatHotkey(_disableHotkey)})";
     }
 
-    private void ProcessHotkey(ref bool previouslyPressed, int hotkey, Action onPressed)
+    private void ProcessHotkey(ref bool previousState, int hotkey, Action onPressed)
     {
         if (!IsValidVirtualKey(hotkey))
         {
-            previouslyPressed = false;
+            previousState = false;
             return;
         }
 
         var currentlyPressed = (GetAsyncKeyState(hotkey) & 0x8000) != 0;
-        if (currentlyPressed && !previouslyPressed)
+        if (currentlyPressed && !previousState)
         {
             onPressed();
         }
 
-        previouslyPressed = currentlyPressed;
+        previousState = currentlyPressed;
     }
 
     private static int NormalizeVirtualKey(int value, int fallback) => IsValidVirtualKey(value) ? value : fallback;
