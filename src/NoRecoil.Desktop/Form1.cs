@@ -324,6 +324,7 @@ public partial class Form1 : Form
                 });
             }
 
+            RemoveDuplicateHotkeys();
             RefreshHotkeyList();
         }
         finally
@@ -723,7 +724,9 @@ public partial class Form1 : Form
 
     private void UpsertHotkey(HotkeyAction action, HotkeyBinding hotkey, string? presetPath)
     {
-        var existingByAction = _hotkeys.FirstOrDefault(item => item.Action == action && action is HotkeyAction.EnableRecoil or HotkeyAction.DisableRecoil);
+        var existingByAction = action is HotkeyAction.EnableRecoil or HotkeyAction.DisableRecoil
+            ? _hotkeys.FirstOrDefault(item => item.Action == action)
+            : null;
         if (existingByAction is not null)
         {
             existingByAction.Hotkey = hotkey;
@@ -746,6 +749,23 @@ public partial class Form1 : Form
         {
             existingByHotkey.Action = action;
             existingByHotkey.PresetPath = normalizedPresetPath;
+        }
+    }
+
+    private void RemoveDuplicateHotkeys()
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        for (var i = _hotkeys.Count - 1; i >= 0; i--)
+        {
+            var current = _hotkeys[i];
+            var key = $"{current.Hotkey.Key}:{(int)current.Hotkey.Modifiers}";
+            if (seen.Contains(key))
+            {
+                _hotkeys.RemoveAt(i);
+                continue;
+            }
+
+            seen.Add(key);
         }
     }
 
@@ -836,7 +856,7 @@ public partial class Form1 : Form
 
     private void ApplyDirectionalStep(TrackBar slider, int step)
     {
-        var updated = CoerceToRange(slider.Value + step, slider.Minimum, slider.Maximum);
+        var updated = Math.Clamp(slider.Value + step, slider.Minimum, slider.Maximum);
         if (updated == slider.Value)
         {
             return;
@@ -857,7 +877,7 @@ public partial class Form1 : Form
     {
         if (target.StartsWith(ActionTargetPrefix, StringComparison.OrdinalIgnoreCase)
             && Enum.TryParse<HotkeyAction>(target[ActionTargetPrefix.Length..], ignoreCase: true, out var action)
-            && action != HotkeyAction.PresetSelection)
+            )
         {
             return (action, string.Empty);
         }
@@ -1104,21 +1124,9 @@ public partial class Form1 : Form
     private sealed class HotkeyActionDialog : Form
     {
         private sealed record ActionOption(HotkeyAction Action, string Label);
-        private readonly List<ActionOption> _actionOptions =
-        [
-            new(HotkeyAction.PresetSelection, "Preset selection"),
-            new(HotkeyAction.EnableRecoil, "Enable recoil"),
-            new(HotkeyAction.DisableRecoil, "Disable recoil"),
-            new(HotkeyAction.ToggleRecoil, "Toggle recoil"),
-            new(HotkeyAction.IncreaseDown, "Increase down value"),
-            new(HotkeyAction.DecreaseDown, "Decrease down value"),
-            new(HotkeyAction.IncreaseUp, "Increase up value"),
-            new(HotkeyAction.DecreaseUp, "Decrease up value"),
-            new(HotkeyAction.IncreaseRight, "Increase right value"),
-            new(HotkeyAction.DecreaseRight, "Decrease right value"),
-            new(HotkeyAction.IncreaseLeft, "Increase left value"),
-            new(HotkeyAction.DecreaseLeft, "Decrease left value"),
-        ];
+        private readonly List<ActionOption> _actionOptions = Enum.GetValues<HotkeyAction>()
+            .Select(action => new ActionOption(action, GetActionDisplayName(action)))
+            .ToList();
         private readonly ComboBox _actionCombo = new();
         private readonly TextBox _presetPathTextBox = new();
         private readonly Button _browseButton = new();
