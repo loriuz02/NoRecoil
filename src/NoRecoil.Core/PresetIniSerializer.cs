@@ -58,7 +58,14 @@ public static class PresetIniSerializer
             var valueText = rawLine[(separator + 1)..].Trim();
             if (int.TryParse(valueText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value))
             {
-                values[key] = value;
+                if (key.Equals("Delay", StringComparison.OrdinalIgnoreCase))
+                {
+                    values[key] = value;
+                }
+                else
+                {
+                    values[key] = NumericValueNormalizer.ToAbsolute(value);
+                }
             }
         }
 

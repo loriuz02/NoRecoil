@@ -66,6 +66,26 @@ public class PresetIniSerializerTests
     }
 
     [Fact]
+    public void Parse_NormalizesDirectionalValuesToAbsolute()
+    {
+        const string input = """
+            Right=-7
+            Down=-14
+            Left=-2
+            Up=-1
+            Delay=-3
+            """;
+
+        var preset = PresetIniSerializer.Parse(input);
+
+        Assert.Equal(7, preset.Right);
+        Assert.Equal(14, preset.Down);
+        Assert.Equal(2, preset.Left);
+        Assert.Equal(1, preset.Up);
+        Assert.Equal(-3, preset.Delay);
+    }
+
+    [Fact]
     public void Serialize_WritesRecoilSectionWhenEnabled()
     {
         var preset = new RecoilPreset
