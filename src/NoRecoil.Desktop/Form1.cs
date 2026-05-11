@@ -14,9 +14,9 @@ public partial class Form1 : Form
     private readonly StringBuilder _bluetoothBuffer = new();
     private SerialPort? _serialPort;
     private bool _applyingProfile;
-    private int _enableHotkey = ProfileSettings.DefaultEnableHotkey;
-    private int _disableHotkey = ProfileSettings.DefaultDisableHotkey;
-    private PendingHotkeySelection _pendingHotkeySelection;
+    private HotkeyBinding _enableHotkey = new() { Key = ProfileSettings.DefaultEnableHotkeyKey };
+    private HotkeyBinding _disableHotkey = new() { Key = ProfileSettings.DefaultDisableHotkeyKey };
+    private readonly List<RuntimePresetHotkey> _presetHotkeys = [];
     private bool _enableHotkeyPressed;
     private bool _disableHotkeyPressed;
 
@@ -33,7 +33,7 @@ public partial class Form1 : Form
         ApplyPreset(new RecoilPreset());
         ApplyRecoilState(false);
         requireRightMouseCheckbox.Checked = true;
-        UpdateHotkeyButtonLabels();
+        ApplyModernTheme();
 
         LoadProfile();
 
@@ -55,41 +55,12 @@ public partial class Form1 : Form
 
     private void setEnableHotkeyButton_Click(object sender, EventArgs e)
     {
-        StartHotkeyCapture(PendingHotkeySelection.Enable);
+        OpenKeybindManager();
     }
 
     private void setDisableHotkeyButton_Click(object sender, EventArgs e)
     {
-        StartHotkeyCapture(PendingHotkeySelection.Disable);
-    }
-
-    private void Form1_KeyDown(object sender, KeyEventArgs e)
-    {
-        if (_pendingHotkeySelection == PendingHotkeySelection.None)
-        {
-            return;
-        }
-
-        var selectedKey = (int)e.KeyCode;
-        if (!IsValidVirtualKey(selectedKey))
-        {
-            return;
-        }
-
-        switch (_pendingHotkeySelection)
-        {
-            case PendingHotkeySelection.Enable:
-                _enableHotkey = selectedKey;
-                break;
-            case PendingHotkeySelection.Disable:
-                _disableHotkey = selectedKey;
-                break;
-        }
-
-        _pendingHotkeySelection = PendingHotkeySelection.None;
-        UpdateHotkeyButtonLabels();
-        SaveProfile();
-        e.SuppressKeyPress = true;
+        OpenKeybindManager();
     }
 
     private void requireRightMouseCheckbox_CheckedChanged(object sender, EventArgs e)
@@ -225,11 +196,6 @@ public partial class Form1 : Form
 
     private void HotkeyTimerOnTick(object? sender, EventArgs e)
     {
-        if (_pendingHotkeySelection != PendingHotkeySelection.None)
-        {
-            return;
-        }
-
         ProcessHotkey(ref _enableHotkeyPressed, _enableHotkey, onPressed: () =>
         {
             if (!_recoilTimer.Enabled)
@@ -247,6 +213,24 @@ public partial class Form1 : Form
                 SaveProfile();
             }
         });
+
+        foreach (var presetHotkey in _presetHotkeys)
+        {
+            ProcessHotkey(ref presetHotkey.IsPressed, presetHotkey.Hotkey, onPressed: () =>
+            {
+                if (!File.Exists(presetHotkey.PresetPath))
+                {
+                    return;
+                }
+
+                var preset = PresetIniSerializer.LoadFromFile(presetHotkey.PresetPath);
+                ApplyPreset(preset);
+                _lastPathCache.Save(presetHotkey.PresetPath);
+                pathValueLabel.Text = presetHotkey.PresetPath;
+                TrySendPresetToBluetooth();
+                SaveProfile();
+            });
+        }
     }
 
     private void SetInitialDirectory(FileDialog dialog)
@@ -310,6 +294,13 @@ public partial class Form1 : Form
         BluetoothPort = bluetoothPortTextbox.Text.Trim(),
         EnableHotkey = _enableHotkey,
         DisableHotkey = _disableHotkey,
+        PresetHotkeys = _presetHotkeys
+            .Select(item => new PresetHotkeyBinding
+            {
+                Hotkey = item.Hotkey,
+                PresetPath = item.PresetPath,
+            })
+            .ToArray(),
     };
 
     private void ApplyProfileSettings(ProfileSettings settings)
@@ -321,10 +312,28 @@ public partial class Form1 : Form
             ApplyRecoilState(settings.RecoilEnabled);
             requireRightMouseCheckbox.Checked = settings.RequireRightMouseButton;
             bluetoothPortTextbox.Text = settings.BluetoothPort;
-            _enableHotkey = NormalizeVirtualKey(settings.EnableHotkey, ProfileSettings.DefaultEnableHotkey);
-            _disableHotkey = NormalizeVirtualKey(settings.DisableHotkey, ProfileSettings.DefaultDisableHotkey);
-            _pendingHotkeySelection = PendingHotkeySelection.None;
-            UpdateHotkeyButtonLabels();
+            _enableHotkey = NormalizeHotkey(settings.EnableHotkey, ProfileSettings.DefaultEnableHotkeyKey);
+            _disableHotkey = NormalizeHotkey(settings.DisableHotkey, ProfileSettings.DefaultDisableHotkeyKey);
+            _presetHotkeys.Clear();
+            foreach (var item in settings.PresetHotkeys)
+            {
+                if (string.IsNullOrWhiteSpace(item.PresetPath))
+                {
+                    continue;
+                }
+
+                var normalized = NormalizeHotkey(item.Hotkey, fallbackKey: 0);
+                if (!IsValidVirtualKey(normalized.Key))
+                {
+                    continue;
+                }
+
+                _presetHotkeys.Add(new RuntimePresetHotkey
+                {
+                    Hotkey = normalized,
+                    PresetPath = item.PresetPath,
+                });
+            }
         }
         finally
         {
@@ -483,6 +492,9 @@ public partial class Form1 : Form
     private const uint MOUSEEVENTF_MOVE = 0x0001;
     private const int VK_LBUTTON = 0x01;
     private const int VK_RBUTTON = 0x02;
+    private const int VK_SHIFT = 0x10;
+    private const int VK_CONTROL = 0x11;
+    private const int VK_MENU = 0x12;
     private const int MinSupportedVirtualKey = 0x01; // Lowest Windows virtual-key code used by GetAsyncKeyState.
     private const int MaxSupportedVirtualKey = 0xFE; // Upper bound supported here; 0xFE (VK_PACKET) and 0xFF have special meanings.
 
@@ -492,33 +504,42 @@ public partial class Form1 : Form
     [DllImport("user32.dll")]
     private static extern void mouse_event(uint dwFlags, int dx, int dy, uint dwData, nuint dwExtraInfo);
 
-    private void StartHotkeyCapture(PendingHotkeySelection selection)
+    private void OpenKeybindManager()
     {
-        _pendingHotkeySelection = selection;
-        UpdateHotkeyButtonLabels();
-        ActiveControl = null;
+        using var keybindsForm = new KeybindsForm(_enableHotkey, _disableHotkey, _presetHotkeys
+            .Select(item => new PresetHotkeyBinding
+            {
+                Hotkey = item.Hotkey,
+                PresetPath = item.PresetPath,
+            }));
+
+        if (keybindsForm.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+
+        _enableHotkey = NormalizeHotkey(keybindsForm.EnableHotkey, ProfileSettings.DefaultEnableHotkeyKey);
+        _disableHotkey = NormalizeHotkey(keybindsForm.DisableHotkey, ProfileSettings.DefaultDisableHotkeyKey);
+        _enableHotkeyPressed = false;
+        _disableHotkeyPressed = false;
+        _presetHotkeys.Clear();
+        _presetHotkeys.AddRange(keybindsForm.PresetHotkeys.Select(item => new RuntimePresetHotkey
+        {
+            Hotkey = NormalizeHotkey(item.Hotkey, fallbackKey: 0),
+            PresetPath = item.PresetPath,
+        }).Where(item => IsValidVirtualKey(item.Hotkey.Key)));
+        SaveProfile();
     }
 
-    private void UpdateHotkeyButtonLabels()
+    private void ProcessHotkey(ref bool previousState, HotkeyBinding hotkey, Action onPressed)
     {
-        setEnableHotkeyButton.Text = _pendingHotkeySelection == PendingHotkeySelection.Enable
-            ? "Press key for enable..."
-            : $"Set enable key ({FormatHotkey(_enableHotkey)})";
-
-        setDisableHotkeyButton.Text = _pendingHotkeySelection == PendingHotkeySelection.Disable
-            ? "Press key for disable..."
-            : $"Set disable key ({FormatHotkey(_disableHotkey)})";
-    }
-
-    private void ProcessHotkey(ref bool previousState, int hotkey, Action onPressed)
-    {
-        if (!IsValidVirtualKey(hotkey))
+        if (!IsValidVirtualKey(hotkey.Key))
         {
             previousState = false;
             return;
         }
 
-        var currentlyPressed = (GetAsyncKeyState(hotkey) & 0x8000) != 0;
+        var currentlyPressed = IsHotkeyPressed(hotkey);
         if (currentlyPressed && !previousState)
         {
             onPressed();
@@ -527,16 +548,82 @@ public partial class Form1 : Form
         previousState = currentlyPressed;
     }
 
-    private static int NormalizeVirtualKey(int value, int fallback) => IsValidVirtualKey(value) ? value : fallback;
+    private static HotkeyBinding NormalizeHotkey(HotkeyBinding? hotkey, int fallbackKey)
+    {
+        if (hotkey is null)
+        {
+            return new HotkeyBinding { Key = fallbackKey, Modifiers = HotkeyModifiers.None };
+        }
+
+        var key = IsValidVirtualKey(hotkey.Key) ? hotkey.Key : fallbackKey;
+        return new HotkeyBinding
+        {
+            Key = key,
+            Modifiers = hotkey.Modifiers,
+        };
+    }
+
+    private static bool IsHotkeyPressed(HotkeyBinding hotkey)
+    {
+        if (!IsValidVirtualKey(hotkey.Key))
+        {
+            return false;
+        }
+
+        var keyPressed = IsVirtualKeyPressed(hotkey.Key);
+        if (!keyPressed)
+        {
+            return false;
+        }
+
+        var shiftPressed = IsVirtualKeyPressed(VK_SHIFT);
+        var controlPressed = IsVirtualKeyPressed(VK_CONTROL);
+        var altPressed = IsVirtualKeyPressed(VK_MENU);
+
+        var requiresShift = hotkey.Modifiers.HasFlag(HotkeyModifiers.Shift);
+        var requiresControl = hotkey.Modifiers.HasFlag(HotkeyModifiers.Control);
+        var requiresAlt = hotkey.Modifiers.HasFlag(HotkeyModifiers.Alt);
+
+        return shiftPressed == requiresShift
+               && controlPressed == requiresControl
+               && altPressed == requiresAlt;
+    }
 
     private static bool IsValidVirtualKey(int value) => value >= MinSupportedVirtualKey && value <= MaxSupportedVirtualKey;
 
-    private static string FormatHotkey(int hotkey) => ((Keys)hotkey).ToString();
+    private static bool IsVirtualKeyPressed(int key) => (GetAsyncKeyState(key) & 0x8000) != 0;
 
-    private enum PendingHotkeySelection
+    private void ApplyModernTheme()
     {
-        None,
-        Enable,
-        Disable,
+        BackColor = Color.FromArgb(20, 24, 33);
+        ForeColor = Color.Gainsboro;
+
+        foreach (var button in Controls.OfType<Button>())
+        {
+            button.FlatStyle = FlatStyle.Flat;
+            button.FlatAppearance.BorderColor = Color.FromArgb(64, 95, 152);
+            button.FlatAppearance.MouseOverBackColor = Color.FromArgb(42, 52, 76);
+            button.BackColor = Color.FromArgb(31, 38, 55);
+            button.ForeColor = Color.Gainsboro;
+        }
+
+        foreach (var textBox in Controls.OfType<TextBox>())
+        {
+            textBox.BackColor = Color.FromArgb(31, 38, 55);
+            textBox.ForeColor = Color.Gainsboro;
+            textBox.BorderStyle = BorderStyle.FixedSingle;
+        }
+
+        foreach (var label in Controls.OfType<Label>())
+        {
+            label.ForeColor = Color.Gainsboro;
+        }
+    }
+
+    private sealed class RuntimePresetHotkey
+    {
+        public HotkeyBinding Hotkey { get; init; } = new();
+        public string PresetPath { get; init; } = string.Empty;
+        public bool IsPressed { get; set; }
     }
 }

@@ -11,14 +11,16 @@ public class ProfileIniSerializerTests
             [Profile]
             Right=5
             Down=17
-            Left=1
+            Left=-1
             Up=2
             Delay=9
             RecoilEnabled=true
             RequireRightMouseButton=false
             BluetoothPort=COM5
-            EnableHotkey=116
-            DisableHotkey=117
+            EnableHotkey=Ctrl+116
+            DisableHotkey=Shift+117
+            PresetHotkey1=Shift+56|C:\presets\ak.ini
+            PresetHotkey2=18+57|C:\presets\m4.ini
             """;
 
         var settings = ProfileIniSerializer.Parse(input);
@@ -31,8 +33,16 @@ public class ProfileIniSerializerTests
         Assert.True(settings.RecoilEnabled);
         Assert.False(settings.RequireRightMouseButton);
         Assert.Equal("COM5", settings.BluetoothPort);
-        Assert.Equal(116, settings.EnableHotkey);
-        Assert.Equal(117, settings.DisableHotkey);
+        Assert.Equal(116, settings.EnableHotkey.Key);
+        Assert.Equal(HotkeyModifiers.Control, settings.EnableHotkey.Modifiers);
+        Assert.Equal(117, settings.DisableHotkey.Key);
+        Assert.Equal(HotkeyModifiers.Shift, settings.DisableHotkey.Modifiers);
+        Assert.Equal(2, settings.PresetHotkeys.Count);
+        Assert.Equal(56, settings.PresetHotkeys[0].Hotkey.Key);
+        Assert.Equal(HotkeyModifiers.Shift, settings.PresetHotkeys[0].Hotkey.Modifiers);
+        Assert.Equal(@"C:\presets\ak.ini", settings.PresetHotkeys[0].PresetPath);
+        Assert.Equal(57, settings.PresetHotkeys[1].Hotkey.Key);
+        Assert.Equal(HotkeyModifiers.None, settings.PresetHotkeys[1].Hotkey.Modifiers);
     }
 
     [Fact]
@@ -50,8 +60,8 @@ public class ProfileIniSerializerTests
         Assert.False(settings.RecoilEnabled);
         Assert.True(settings.RequireRightMouseButton);
         Assert.Equal(string.Empty, settings.BluetoothPort);
-        Assert.Equal(ProfileSettings.DefaultEnableHotkey, settings.EnableHotkey);
-        Assert.Equal(ProfileSettings.DefaultDisableHotkey, settings.DisableHotkey);
+        Assert.Equal(ProfileSettings.DefaultEnableHotkeyKey, settings.EnableHotkey.Key);
+        Assert.Equal(ProfileSettings.DefaultDisableHotkeyKey, settings.DisableHotkey.Key);
     }
 
     [Fact]
@@ -70,8 +80,28 @@ public class ProfileIniSerializerTests
             RecoilEnabled = true,
             RequireRightMouseButton = true,
             BluetoothPort = "COM7",
-            EnableHotkey = 114,
-            DisableHotkey = 115,
+            EnableHotkey = new HotkeyBinding
+            {
+                Key = 114,
+                Modifiers = HotkeyModifiers.Control,
+            },
+            DisableHotkey = new HotkeyBinding
+            {
+                Key = 115,
+                Modifiers = HotkeyModifiers.Shift | HotkeyModifiers.Alt,
+            },
+            PresetHotkeys =
+            [
+                new PresetHotkeyBinding
+                {
+                    Hotkey = new HotkeyBinding
+                    {
+                        Key = 56,
+                        Modifiers = HotkeyModifiers.Shift,
+                    },
+                    PresetPath = @"C:\presets\ak.ini",
+                },
+            ],
         };
 
         var ini = ProfileIniSerializer.Serialize(settings, includeSectionHeader: true);
@@ -85,7 +115,8 @@ public class ProfileIniSerializerTests
         Assert.Contains("RecoilEnabled=True", ini);
         Assert.Contains("RequireRightMouseButton=True", ini);
         Assert.Contains("BluetoothPort=COM7", ini);
-        Assert.Contains("EnableHotkey=114", ini);
-        Assert.Contains("DisableHotkey=115", ini);
+        Assert.Contains("EnableHotkey=Ctrl+114", ini);
+        Assert.Contains("DisableHotkey=Alt+Shift+115", ini);
+        Assert.Contains(@"PresetHotkey1=Shift+56|C:\presets\ak.ini", ini);
     }
 }

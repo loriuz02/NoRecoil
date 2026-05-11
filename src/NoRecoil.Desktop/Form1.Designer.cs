@@ -47,8 +47,7 @@ partial class Form1
         saveButton = new Button();
         loadButton = new Button();
         toggleRecoilButton = new Button();
-        setEnableHotkeyButton = new Button();
-        setDisableHotkeyButton = new Button();
+        manageKeybindsButton = new Button();
         requireRightMouseCheckbox = new CheckBox();
         statusLabel = new Label();
         statusValueLabel = new Label();
@@ -231,33 +230,23 @@ partial class Form1
         toggleRecoilButton.UseVisualStyleBackColor = true;
         toggleRecoilButton.Click += toggleRecoilButton_Click;
         // 
-        // setEnableHotkeyButton
+        // manageKeybindsButton
         // 
-        setEnableHotkeyButton.Location = new Point(210, 318);
-        setEnableHotkeyButton.Name = "setEnableHotkeyButton";
-        setEnableHotkeyButton.Size = new Size(150, 32);
-        setEnableHotkeyButton.TabIndex = 18;
-        setEnableHotkeyButton.Text = "Set enable key (F1)";
-        setEnableHotkeyButton.UseVisualStyleBackColor = true;
-        setEnableHotkeyButton.Click += setEnableHotkeyButton_Click;
-        // 
-        // setDisableHotkeyButton
-        // 
-        setDisableHotkeyButton.Location = new Point(20, 356);
-        setDisableHotkeyButton.Name = "setDisableHotkeyButton";
-        setDisableHotkeyButton.Size = new Size(180, 32);
-        setDisableHotkeyButton.TabIndex = 19;
-        setDisableHotkeyButton.Text = "Set disable key (F2)";
-        setDisableHotkeyButton.UseVisualStyleBackColor = true;
-        setDisableHotkeyButton.Click += setDisableHotkeyButton_Click;
+        manageKeybindsButton.Location = new Point(210, 318);
+        manageKeybindsButton.Name = "manageKeybindsButton";
+        manageKeybindsButton.Size = new Size(180, 32);
+        manageKeybindsButton.TabIndex = 18;
+        manageKeybindsButton.Text = "Manage keybinds";
+        manageKeybindsButton.UseVisualStyleBackColor = true;
+        manageKeybindsButton.Click += setEnableHotkeyButton_Click;
         // 
         // requireRightMouseCheckbox
         // 
         requireRightMouseCheckbox.AutoSize = true;
-        requireRightMouseCheckbox.Location = new Point(210, 360);
+        requireRightMouseCheckbox.Location = new Point(20, 360);
         requireRightMouseCheckbox.Name = "requireRightMouseCheckbox";
         requireRightMouseCheckbox.Size = new Size(284, 24);
-        requireRightMouseCheckbox.TabIndex = 20;
+        requireRightMouseCheckbox.TabIndex = 19;
         requireRightMouseCheckbox.Text = "Require right mouse together with left";
         requireRightMouseCheckbox.UseVisualStyleBackColor = true;
         requireRightMouseCheckbox.CheckedChanged += requireRightMouseCheckbox_CheckedChanged;
@@ -283,7 +272,7 @@ partial class Form1
         // pathLabel
         // 
         pathLabel.AutoSize = true;
-        pathLabel.Location = new Point(20, 389);
+        pathLabel.Location = new Point(20, 394);
         pathLabel.Name = "pathLabel";
         pathLabel.Size = new Size(69, 20);
         pathLabel.TabIndex = 23;
@@ -292,7 +281,7 @@ partial class Form1
         // pathValueLabel
         // 
         pathValueLabel.AutoEllipsis = true;
-        pathValueLabel.Location = new Point(95, 389);
+        pathValueLabel.Location = new Point(95, 394);
         pathValueLabel.Name = "pathValueLabel";
         pathValueLabel.Size = new Size(343, 20);
         pathValueLabel.TabIndex = 24;
@@ -301,7 +290,7 @@ partial class Form1
         // bluetoothPortLabel
         // 
         bluetoothPortLabel.AutoSize = true;
-        bluetoothPortLabel.Location = new Point(20, 423);
+        bluetoothPortLabel.Location = new Point(20, 428);
         bluetoothPortLabel.Name = "bluetoothPortLabel";
         bluetoothPortLabel.Size = new Size(105, 20);
         bluetoothPortLabel.TabIndex = 25;
@@ -309,7 +298,7 @@ partial class Form1
         // 
         // bluetoothPortTextbox
         // 
-        bluetoothPortTextbox.Location = new Point(131, 420);
+        bluetoothPortTextbox.Location = new Point(131, 425);
         bluetoothPortTextbox.Name = "bluetoothPortTextbox";
         bluetoothPortTextbox.PlaceholderText = "COM5";
         bluetoothPortTextbox.Size = new Size(99, 27);
@@ -318,7 +307,7 @@ partial class Form1
         // 
         // connectBluetoothButton
         // 
-        connectBluetoothButton.Location = new Point(238, 418);
+        connectBluetoothButton.Location = new Point(238, 423);
         connectBluetoothButton.Name = "connectBluetoothButton";
         connectBluetoothButton.Size = new Size(95, 31);
         connectBluetoothButton.TabIndex = 27;
@@ -329,7 +318,7 @@ partial class Form1
         // bluetoothStatusLabel
         // 
         bluetoothStatusLabel.AutoSize = true;
-        bluetoothStatusLabel.Location = new Point(340, 423);
+        bluetoothStatusLabel.Location = new Point(340, 428);
         bluetoothStatusLabel.Name = "bluetoothStatusLabel";
         bluetoothStatusLabel.Size = new Size(52, 20);
         bluetoothStatusLabel.TabIndex = 28;
@@ -338,7 +327,7 @@ partial class Form1
         // bluetoothStatusValueLabel
         // 
         bluetoothStatusValueLabel.AutoSize = true;
-        bluetoothStatusValueLabel.Location = new Point(397, 423);
+        bluetoothStatusValueLabel.Location = new Point(397, 428);
         bluetoothStatusValueLabel.Name = "bluetoothStatusValueLabel";
         bluetoothStatusValueLabel.Size = new Size(97, 20);
         bluetoothStatusValueLabel.TabIndex = 29;
@@ -359,8 +348,7 @@ partial class Form1
         Controls.Add(statusValueLabel);
         Controls.Add(statusLabel);
         Controls.Add(requireRightMouseCheckbox);
-        Controls.Add(setDisableHotkeyButton);
-        Controls.Add(setEnableHotkeyButton);
+        Controls.Add(manageKeybindsButton);
         Controls.Add(toggleRecoilButton);
         Controls.Add(loadButton);
         Controls.Add(saveButton);
@@ -380,11 +368,9 @@ partial class Form1
         Controls.Add(downSlider);
         Controls.Add(rightSlider);
         FormBorderStyle = FormBorderStyle.FixedDialog;
-        KeyPreview = true;
         MaximizeBox = false;
         Name = "Form1";
         Text = "NoRecoil Preset Controller";
-        KeyDown += Form1_KeyDown;
         ((System.ComponentModel.ISupportInitialize)rightSlider).EndInit();
         ((System.ComponentModel.ISupportInitialize)downSlider).EndInit();
         ((System.ComponentModel.ISupportInitialize)leftSlider).EndInit();
@@ -414,8 +400,7 @@ partial class Form1
     private Button saveButton;
     private Button loadButton;
     private Button toggleRecoilButton;
-    private Button setEnableHotkeyButton;
-    private Button setDisableHotkeyButton;
+    private Button manageKeybindsButton;
     private CheckBox requireRightMouseCheckbox;
     private Label statusLabel;
     private Label statusValueLabel;

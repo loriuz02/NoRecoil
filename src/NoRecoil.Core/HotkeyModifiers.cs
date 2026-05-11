@@ -1,0 +1,10 @@
+namespace NoRecoil.Core;
+
+[Flags]
+public enum HotkeyModifiers
+{
+    None = 0,
+    Shift = 1 << 0,
+    Control = 1 << 1,
+    Alt = 1 << 2,
+}

@@ -58,7 +58,7 @@ public static class PresetIniSerializer
             var valueText = rawLine[(separator + 1)..].Trim();
             if (int.TryParse(valueText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value))
             {
-                values[key] = value;
+                values[key] = key.Equals("Delay", StringComparison.OrdinalIgnoreCase) ? value : ToAbsoluteValue(value);
             }
         }
 
@@ -121,4 +121,6 @@ public static class PresetIniSerializer
 
         return key;
     }
+
+    private static int ToAbsoluteValue(int value) => value == int.MinValue ? int.MaxValue : Math.Abs(value);
 }

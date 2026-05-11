@@ -21,9 +21,10 @@ public static class ProfileIniSerializer
             ["RecoilEnabled"] = "false",
             ["RequireRightMouseButton"] = "true",
             ["BluetoothPort"] = string.Empty,
-            ["EnableHotkey"] = ProfileSettings.DefaultEnableHotkey.ToString(CultureInfo.InvariantCulture),
-            ["DisableHotkey"] = ProfileSettings.DefaultDisableHotkey.ToString(CultureInfo.InvariantCulture),
+            ["EnableHotkey"] = ProfileSettings.DefaultEnableHotkeyKey.ToString(CultureInfo.InvariantCulture),
+            ["DisableHotkey"] = ProfileSettings.DefaultDisableHotkeyKey.ToString(CultureInfo.InvariantCulture),
         };
+        var presetHotkeyEntries = new List<string>();
 
         foreach (var rawLine in content.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
@@ -39,6 +40,17 @@ public static class ProfileIniSerializer
             }
 
             var key = rawLine[..separator].Trim();
+            if (key.StartsWith("PresetHotkey", StringComparison.OrdinalIgnoreCase))
+            {
+                var valueText = separator == rawLine.Length - 1 ? string.Empty : rawLine[(separator + 1)..].Trim();
+                if (!string.IsNullOrWhiteSpace(valueText))
+                {
+                    presetHotkeyEntries.Add(valueText);
+                }
+
+                continue;
+            }
+
             if (!values.ContainsKey(key))
             {
                 continue;
@@ -52,17 +64,26 @@ public static class ProfileIniSerializer
         {
             Preset = new RecoilPreset
             {
-                Right = ParseIntOrDefault(values["Right"]),
-                Down = ParseIntOrDefault(values["Down"]),
-                Left = ParseIntOrDefault(values["Left"]),
-                Up = ParseIntOrDefault(values["Up"]),
+                Right = ParseAbsoluteIntOrDefault(values["Right"]),
+                Down = ParseAbsoluteIntOrDefault(values["Down"]),
+                Left = ParseAbsoluteIntOrDefault(values["Left"]),
+                Up = ParseAbsoluteIntOrDefault(values["Up"]),
                 Delay = ParseIntOrDefault(values["Delay"]),
             },
             RecoilEnabled = ParseBoolOrDefault(values["RecoilEnabled"], defaultValue: false),
             RequireRightMouseButton = ParseBoolOrDefault(values["RequireRightMouseButton"], defaultValue: true),
             BluetoothPort = values["BluetoothPort"],
-            EnableHotkey = ParseIntOrDefault(values["EnableHotkey"]),
-            DisableHotkey = ParseIntOrDefault(values["DisableHotkey"]),
+            EnableHotkey = HotkeyBindingSerializer.ParseOrDefault(values["EnableHotkey"], new HotkeyBinding
+            {
+                Key = ProfileSettings.DefaultEnableHotkeyKey,
+                Modifiers = HotkeyModifiers.None,
+            }),
+            DisableHotkey = HotkeyBindingSerializer.ParseOrDefault(values["DisableHotkey"], new HotkeyBinding
+            {
+                Key = ProfileSettings.DefaultDisableHotkeyKey,
+                Modifiers = HotkeyModifiers.None,
+            }),
+            PresetHotkeys = ParsePresetHotkeys(presetHotkeyEntries),
         };
     }
 
@@ -85,8 +106,15 @@ public static class ProfileIniSerializer
         output.AppendLine($"RecoilEnabled={settings.RecoilEnabled}");
         output.AppendLine($"RequireRightMouseButton={settings.RequireRightMouseButton}");
         output.AppendLine($"BluetoothPort={settings.BluetoothPort}");
-        output.AppendLine($"EnableHotkey={settings.EnableHotkey}");
-        output.AppendLine($"DisableHotkey={settings.DisableHotkey}");
+        output.AppendLine($"EnableHotkey={HotkeyBindingSerializer.Serialize(settings.EnableHotkey)}");
+        output.AppendLine($"DisableHotkey={HotkeyBindingSerializer.Serialize(settings.DisableHotkey)}");
+
+        for (var i = 0; i < settings.PresetHotkeys.Count; i++)
+        {
+            var entry = settings.PresetHotkeys[i];
+            var hotkey = HotkeyBindingSerializer.Serialize(entry.Hotkey);
+            output.AppendLine($"PresetHotkey{i + 1}={hotkey}|{entry.PresetPath}");
+        }
 
         return output.ToString();
     }
@@ -110,6 +138,16 @@ public static class ProfileIniSerializer
         return int.TryParse(valueText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) ? value : 0;
     }
 
+    private static int ParseAbsoluteIntOrDefault(string valueText)
+    {
+        if (!int.TryParse(valueText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value))
+        {
+            return 0;
+        }
+
+        return value == int.MinValue ? int.MaxValue : Math.Abs(value);
+    }
+
     private static bool ParseBoolOrDefault(string valueText, bool defaultValue)
     {
         if (bool.TryParse(valueText, out var parsedBool))
@@ -130,5 +168,34 @@ public static class ProfileIniSerializer
             "no" => false,
             _ => defaultValue,
         };
+    }
+
+    private static IReadOnlyList<PresetHotkeyBinding> ParsePresetHotkeys(IEnumerable<string> entries)
+    {
+        var parsed = new List<PresetHotkeyBinding>();
+        foreach (var entry in entries)
+        {
+            var separator = entry.IndexOf('|');
+            if (separator <= 0 || separator == entry.Length - 1)
+            {
+                continue;
+            }
+
+            var hotkeyText = entry[..separator].Trim();
+            var presetPath = entry[(separator + 1)..].Trim();
+            if (string.IsNullOrWhiteSpace(presetPath))
+            {
+                continue;
+            }
+
+            var hotkey = HotkeyBindingSerializer.ParseOrDefault(hotkeyText, new HotkeyBinding());
+            parsed.Add(new PresetHotkeyBinding
+            {
+                Hotkey = hotkey,
+                PresetPath = presetPath,
+            });
+        }
+
+        return parsed;
     }
 }
