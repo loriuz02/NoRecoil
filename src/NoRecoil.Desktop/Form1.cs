@@ -67,7 +67,7 @@ public partial class Form1 : Form
         SaveProfile();
     }
 
-    private void setEnableHotkeyButton_Click(object sender, EventArgs e)
+    private void setEnableHotkeyButton_Click(object? sender, EventArgs e)
     {
         CaptureAndApplyHotkey(
             "Configure enable hotkey",
@@ -75,7 +75,7 @@ public partial class Form1 : Form
             binding => _enableHotkey = binding);
     }
 
-    private void setDisableHotkeyButton_Click(object sender, EventArgs e)
+    private void setDisableHotkeyButton_Click(object? sender, EventArgs e)
     {
         CaptureAndApplyHotkey(
             "Configure disable hotkey",
