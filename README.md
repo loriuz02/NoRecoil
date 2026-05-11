@@ -2,7 +2,7 @@
 
 NoRecoil now includes:
 
-- A **Windows C# desktop app** (`src/NoRecoil.Desktop`) with sliders for Right/Down/Left/Up/Delay
+- A **Windows WPF desktop app** (`src/NoRecoil.Desktop`) with sliders for Right/Down/Left/Up/Delay
 - Preset **save/load** buttons
 - Last-selected file path cache
 - Auto-created `profile.ini` in the executable folder to persist selected settings (recoil values, state, trigger mode, Bluetooth COM)
