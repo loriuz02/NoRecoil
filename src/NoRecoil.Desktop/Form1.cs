@@ -14,22 +14,17 @@ public partial class Form1 : Form
     private readonly StringBuilder _bluetoothBuffer = new();
     private SerialPort? _serialPort;
     private bool _applyingProfile;
-    private HotkeyBinding _enableHotkey = new() { Key = ProfileSettings.DefaultEnableHotkeyKey };
-    private HotkeyBinding _disableHotkey = new() { Key = ProfileSettings.DefaultDisableHotkeyKey };
-    private readonly List<RuntimePresetHotkey> _presetHotkeys = [];
-    private bool _enableHotkeyPressed;
-    private bool _disableHotkeyPressed;
+    private readonly List<RuntimeHotkeyBinding> _hotkeys = [];
     private readonly TabControl _tabs = new();
     private readonly TabPage _mainTab = new("🎯 Main");
     private readonly TabPage _keybindsTab = new("⌨️ Keybinds");
     private readonly TabPage _bluetoothTab = new("📶 Bluetooth");
+    private readonly Label _hotkeysLabel = new();
     private readonly Label _keybindHintLabel = new();
-    private readonly Label _presetHotkeysLabel = new();
-    private readonly ListBox _presetHotkeysList = new();
-    private readonly Button _setEnableHotkeyButton = new();
-    private readonly Button _setDisableHotkeyButton = new();
-    private readonly Button _addPresetHotkeyButton = new();
-    private readonly Button _removePresetHotkeyButton = new();
+    private readonly ListBox _hotkeysList = new();
+    private readonly Button _addHotkeyButton = new();
+    private readonly Button _editHotkeyButton = new();
+    private readonly Button _removeHotkeyButton = new();
 
     public Form1()
     {
@@ -69,18 +64,7 @@ public partial class Form1 : Form
 
     private void setEnableHotkeyButton_Click(object? sender, EventArgs e)
     {
-        CaptureAndApplyHotkey(
-            "Configure enable hotkey",
-            "⌨️ Press the key combination to enable recoil",
-            binding => _enableHotkey = binding);
-    }
-
-    private void setDisableHotkeyButton_Click(object? sender, EventArgs e)
-    {
-        CaptureAndApplyHotkey(
-            "Configure disable hotkey",
-            "⌨️ Press the key combination to disable recoil",
-            binding => _disableHotkey = binding);
+        _tabs.SelectedTab = _keybindsTab;
     }
 
     private void requireRightMouseCheckbox_CheckedChanged(object sender, EventArgs e)
@@ -216,39 +200,11 @@ public partial class Form1 : Form
 
     private void HotkeyTimerOnTick(object? sender, EventArgs e)
     {
-        ProcessHotkey(ref _enableHotkeyPressed, _enableHotkey, onPressed: () =>
+        foreach (var hotkeyBinding in _hotkeys)
         {
-            if (!_recoilTimer.Enabled)
+            ProcessHotkey(ref hotkeyBinding.IsPressed, hotkeyBinding.Hotkey, onPressed: () =>
             {
-                ApplyRecoilState(true);
-                SaveProfile();
-            }
-        });
-
-        ProcessHotkey(ref _disableHotkeyPressed, _disableHotkey, onPressed: () =>
-        {
-            if (_recoilTimer.Enabled)
-            {
-                ApplyRecoilState(false);
-                SaveProfile();
-            }
-        });
-
-        foreach (var presetHotkey in _presetHotkeys)
-        {
-            ProcessHotkey(ref presetHotkey.IsPressed, presetHotkey.Hotkey, onPressed: () =>
-            {
-                if (!File.Exists(presetHotkey.PresetPath))
-                {
-                    return;
-                }
-
-                var preset = PresetIniSerializer.LoadFromFile(presetHotkey.PresetPath);
-                ApplyPreset(preset);
-                _lastPathCache.Save(presetHotkey.PresetPath);
-                pathValueLabel.Text = presetHotkey.PresetPath;
-                TrySendPresetToBluetooth();
-                SaveProfile();
+                ExecuteHotkeyAction(hotkeyBinding);
             });
         }
     }
@@ -312,14 +268,15 @@ public partial class Form1 : Form
         RecoilEnabled = _recoilTimer.Enabled,
         RequireRightMouseButton = requireRightMouseCheckbox.Checked,
         BluetoothPort = bluetoothPortTextbox.Text.Trim(),
-        EnableHotkey = _enableHotkey,
-        DisableHotkey = _disableHotkey,
-        PresetHotkeys = _presetHotkeys
+        EnableHotkey = GetRequiredHotkey(HotkeyAction.EnableRecoil, ProfileSettings.DefaultEnableHotkeyKey),
+        DisableHotkey = GetRequiredHotkey(HotkeyAction.DisableRecoil, ProfileSettings.DefaultDisableHotkeyKey),
+        PresetHotkeys = _hotkeys
+            .Where(item => item.Action is not HotkeyAction.EnableRecoil and not HotkeyAction.DisableRecoil)
             .Take(ProfileSettings.MaxPresetHotkeys)
             .Select(item => new PresetHotkeyBinding
             {
                 Hotkey = item.Hotkey,
-                PresetPath = item.PresetPath,
+                PresetPath = EncodeHotkeyTarget(item),
             })
             .ToArray(),
     };
@@ -333,12 +290,22 @@ public partial class Form1 : Form
             ApplyRecoilState(settings.RecoilEnabled);
             requireRightMouseCheckbox.Checked = settings.RequireRightMouseButton;
             bluetoothPortTextbox.Text = settings.BluetoothPort;
-            _enableHotkey = NormalizeHotkey(settings.EnableHotkey, ProfileSettings.DefaultEnableHotkeyKey);
-            _disableHotkey = NormalizeHotkey(settings.DisableHotkey, ProfileSettings.DefaultDisableHotkeyKey);
-            _presetHotkeys.Clear();
+            _hotkeys.Clear();
+            _hotkeys.Add(new RuntimeHotkeyBinding
+            {
+                Hotkey = NormalizeHotkey(settings.EnableHotkey, ProfileSettings.DefaultEnableHotkeyKey),
+                Action = HotkeyAction.EnableRecoil,
+            });
+            _hotkeys.Add(new RuntimeHotkeyBinding
+            {
+                Hotkey = NormalizeHotkey(settings.DisableHotkey, ProfileSettings.DefaultDisableHotkeyKey),
+                Action = HotkeyAction.DisableRecoil,
+            });
+
             foreach (var item in settings.PresetHotkeys.Take(ProfileSettings.MaxPresetHotkeys))
             {
-                if (string.IsNullOrWhiteSpace(item.PresetPath))
+                var decoded = DecodeHotkeyTarget(item.PresetPath);
+                if (decoded.Action == HotkeyAction.PresetSelection && string.IsNullOrWhiteSpace(decoded.PresetPath))
                 {
                     continue;
                 }
@@ -349,15 +316,15 @@ public partial class Form1 : Form
                     continue;
                 }
 
-                _presetHotkeys.Add(new RuntimePresetHotkey
+                _hotkeys.Add(new RuntimeHotkeyBinding
                 {
                     Hotkey = normalized,
-                    PresetPath = item.PresetPath,
+                    Action = decoded.Action,
+                    PresetPath = decoded.PresetPath,
                 });
             }
 
-            RefreshPresetHotkeyList();
-            UpdateKeybindButtonLabels();
+            RefreshHotkeyList();
         }
         finally
         {
@@ -578,53 +545,52 @@ public partial class Form1 : Form
 
     private void InitializeKeybindsTab()
     {
-        _setEnableHotkeyButton.Location = new Point(20, 22);
-        _setEnableHotkeyButton.Size = new Size(290, 36);
-        _setEnableHotkeyButton.Click += setEnableHotkeyButton_Click;
+        _hotkeysLabel.AutoSize = true;
+        _hotkeysLabel.Location = new Point(20, 20);
+        _hotkeysLabel.Text = "⌨️ Hotkeys list";
 
-        _setDisableHotkeyButton.Location = new Point(326, 22);
-        _setDisableHotkeyButton.Size = new Size(290, 36);
-        _setDisableHotkeyButton.Click += setDisableHotkeyButton_Click;
+        _keybindHintLabel.Location = new Point(20, 46);
+        _keybindHintLabel.Size = new Size(470, 24);
+        _keybindHintLabel.Text = "💡 F1/F2 are preconfigured; add or edit hotkeys to customize actions.";
 
-        _keybindHintLabel.Location = new Point(20, 66);
-        _keybindHintLabel.Size = new Size(596, 24);
-        _keybindHintLabel.Text = "💡 Configure enable/disable recoil and preset shortcuts.";
-
-        _presetHotkeysLabel.AutoSize = true;
-        _presetHotkeysLabel.Location = new Point(20, 102);
-        _presetHotkeysLabel.Text = "🎮 Preset hotkeys (max 20)";
-
-        _presetHotkeysList.Location = new Point(20, 128);
-        _presetHotkeysList.Size = new Size(596, 184);
-        _presetHotkeysList.Format += (_, args) =>
+        _hotkeysList.Location = new Point(20, 74);
+        _hotkeysList.Size = new Size(470, 194);
+        _hotkeysList.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+        _hotkeysList.Format += (_, args) =>
         {
-            if (args.ListItem is RuntimePresetHotkey item)
+            if (args.ListItem is RuntimeHotkeyBinding item)
             {
-                var fileName = Path.GetFileName(item.PresetPath);
-                args.Value = $"{FormatHotkey(item.Hotkey)} ➜ {fileName}";
+                args.Value = $"{FormatHotkey(item.Hotkey)} ➜ {GetActionDisplayText(item)}";
             }
         };
 
-        _addPresetHotkeyButton.Location = new Point(20, 324);
-        _addPresetHotkeyButton.Size = new Size(190, 36);
-        _addPresetHotkeyButton.Text = "➕ Add preset hotkey";
-        _addPresetHotkeyButton.Click += (_, _) => AddPresetHotkey();
+        _addHotkeyButton.Location = new Point(20, 278);
+        _addHotkeyButton.Size = new Size(150, 36);
+        _addHotkeyButton.Text = "➕ Add hotkey";
+        _addHotkeyButton.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
+        _addHotkeyButton.Click += (_, _) => AddHotkey();
 
-        _removePresetHotkeyButton.Location = new Point(220, 324);
-        _removePresetHotkeyButton.Size = new Size(190, 36);
-        _removePresetHotkeyButton.Text = "➖ Remove selected";
-        _removePresetHotkeyButton.Click += (_, _) => RemoveSelectedPresetHotkey();
+        _editHotkeyButton.Location = new Point(180, 278);
+        _editHotkeyButton.Size = new Size(150, 36);
+        _editHotkeyButton.Text = "✏️ Edit selected";
+        _editHotkeyButton.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
+        _editHotkeyButton.Click += (_, _) => EditSelectedHotkey();
 
-        _keybindsTab.Controls.Add(_setEnableHotkeyButton);
-        _keybindsTab.Controls.Add(_setDisableHotkeyButton);
+        _removeHotkeyButton.Location = new Point(340, 278);
+        _removeHotkeyButton.Size = new Size(150, 36);
+        _removeHotkeyButton.Text = "➖ Remove selected";
+        _removeHotkeyButton.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
+        _removeHotkeyButton.Click += (_, _) => RemoveSelectedHotkey();
+
+        _keybindsTab.Controls.Add(_hotkeysLabel);
         _keybindsTab.Controls.Add(_keybindHintLabel);
-        _keybindsTab.Controls.Add(_presetHotkeysLabel);
-        _keybindsTab.Controls.Add(_presetHotkeysList);
-        _keybindsTab.Controls.Add(_addPresetHotkeyButton);
-        _keybindsTab.Controls.Add(_removePresetHotkeyButton);
+        _keybindsTab.Controls.Add(_hotkeysList);
+        _keybindsTab.Controls.Add(_addHotkeyButton);
+        _keybindsTab.Controls.Add(_editHotkeyButton);
+        _keybindsTab.Controls.Add(_removeHotkeyButton);
 
-        UpdateKeybindButtonLabels();
-        RefreshPresetHotkeyList();
+        EnsureDefaultHotkeys();
+        RefreshHotkeyList();
     }
 
     private void ApplyEmojiText()
@@ -640,85 +606,77 @@ public partial class Form1 : Form
         connectBluetoothButton.Text = "🔗 Connect";
         bluetoothStatusLabel.Text = "Status:";
         bluetoothStatusValueLabel.Text = "🔴 Disconnected";
-        UpdateKeybindButtonLabels();
+        _hotkeysLabel.Text = "⌨️ Hotkeys list";
     }
 
-    private void UpdateKeybindButtonLabels()
+    private void RefreshHotkeyList()
     {
-        _setEnableHotkeyButton.Text = $"✅ Enable hotkey ({FormatHotkey(_enableHotkey)})";
-        _setDisableHotkeyButton.Text = $"⛔ Disable hotkey ({FormatHotkey(_disableHotkey)})";
-    }
-
-    private void RefreshPresetHotkeyList()
-    {
-        _presetHotkeysList.Items.Clear();
-        foreach (var presetHotkey in _presetHotkeys.OrderBy(hotkey => hotkey.Hotkey.Modifiers).ThenBy(hotkey => hotkey.Hotkey.Key))
+        EnsureDefaultHotkeys();
+        _hotkeysList.Items.Clear();
+        foreach (var hotkeyBinding in _hotkeys.OrderBy(hotkey => hotkey.Hotkey.Modifiers).ThenBy(hotkey => hotkey.Hotkey.Key))
         {
-            _presetHotkeysList.Items.Add(presetHotkey);
+            _hotkeysList.Items.Add(hotkeyBinding);
         }
     }
 
-    private void AddPresetHotkey()
+    private void AddHotkey()
     {
-        if (_presetHotkeys.Count >= ProfileSettings.MaxPresetHotkeys)
+        if (_hotkeys.Count(item => item.Action is not HotkeyAction.EnableRecoil and not HotkeyAction.DisableRecoil)
+            >= ProfileSettings.MaxPresetHotkeys)
         {
             MessageBox.Show(
                 this,
-                $"You can configure up to {ProfileSettings.MaxPresetHotkeys} preset hotkeys.",
+                $"You can configure up to {ProfileSettings.MaxPresetHotkeys} custom hotkeys.",
                 "NoRecoil",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
             return;
         }
 
-        using var dialog = new OpenFileDialog
-        {
-            Filter = "INI files (*.ini)|*.ini|All files (*.*)|*.*",
-            DefaultExt = "ini",
-            CheckFileExists = true,
-        };
-
-        SetInitialDirectory(dialog);
-        if (dialog.ShowDialog(this) != DialogResult.OK)
+        using var actionDialog = new HotkeyActionDialog();
+        if (actionDialog.ShowDialog(this) != DialogResult.OK)
         {
             return;
         }
 
         CaptureAndApplyHotkey(
-            "Configure preset hotkey",
-            "⌨️ Press the key combination to load the selected preset",
-            binding =>
-            {
-                var existing = _presetHotkeys.FirstOrDefault(
-                    item => item.Hotkey.Key == binding.Key && item.Hotkey.Modifiers == binding.Modifiers);
-
-                var updated = new RuntimePresetHotkey
-                {
-                    Hotkey = binding,
-                    PresetPath = dialog.FileName,
-                };
-
-                if (existing is null)
-                {
-                    _presetHotkeys.Add(updated);
-                }
-                else
-                {
-                    var index = _presetHotkeys.IndexOf(existing);
-                    _presetHotkeys[index] = updated;
-                }
-            });
+            "Configure hotkey",
+            $"⌨️ Press the key combination for {GetActionDisplayName(actionDialog.SelectedAction)}",
+            binding => UpsertHotkey(actionDialog.SelectedAction, binding, actionDialog.SelectedPresetPath));
     }
 
-    private void RemoveSelectedPresetHotkey()
+    private void EditSelectedHotkey()
     {
-        if (_presetHotkeysList.SelectedItem is not RuntimePresetHotkey selected)
+        if (_hotkeysList.SelectedItem is not RuntimeHotkeyBinding selected)
         {
             return;
         }
 
-        _presetHotkeys.Remove(selected);
-        RefreshPresetHotkeyList();
+        CaptureAndApplyHotkey(
+            "Change hotkey",
+            $"⌨️ Press the new key combination for {GetActionDisplayText(selected)}",
+            binding =>
+            {
+                selected.Hotkey = binding;
+                DeduplicateByHotkey(selected);
+            });
+    }
+
+    private void RemoveSelectedHotkey()
+    {
+        if (_hotkeysList.SelectedItem is not RuntimeHotkeyBinding selected)
+        {
+            return;
+        }
+
+        if (selected.Action is HotkeyAction.EnableRecoil or HotkeyAction.DisableRecoil)
+        {
+            MessageBox.Show(this, "Enable/disable hotkeys are required and cannot be removed.", "NoRecoil", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        _hotkeys.Remove(selected);
+        RefreshHotkeyList();
         SaveProfile();
     }
 
@@ -731,11 +689,207 @@ public partial class Form1 : Form
         }
 
         apply(dialog.CapturedHotkey);
-        _enableHotkeyPressed = false;
-        _disableHotkeyPressed = false;
-        UpdateKeybindButtonLabels();
-        RefreshPresetHotkeyList();
+        ResetPressedStates();
+        RefreshHotkeyList();
         SaveProfile();
+    }
+
+    private void EnsureDefaultHotkeys()
+    {
+        if (!_hotkeys.Any(item => item.Action == HotkeyAction.EnableRecoil))
+        {
+            _hotkeys.Add(new RuntimeHotkeyBinding
+            {
+                Hotkey = new HotkeyBinding { Key = ProfileSettings.DefaultEnableHotkeyKey, Modifiers = HotkeyModifiers.None },
+                Action = HotkeyAction.EnableRecoil,
+            });
+        }
+
+        if (!_hotkeys.Any(item => item.Action == HotkeyAction.DisableRecoil))
+        {
+            _hotkeys.Add(new RuntimeHotkeyBinding
+            {
+                Hotkey = new HotkeyBinding { Key = ProfileSettings.DefaultDisableHotkeyKey, Modifiers = HotkeyModifiers.None },
+                Action = HotkeyAction.DisableRecoil,
+            });
+        }
+    }
+
+    private HotkeyBinding GetRequiredHotkey(HotkeyAction action, int fallbackKey)
+    {
+        var match = _hotkeys.FirstOrDefault(item => item.Action == action);
+        return NormalizeHotkey(match?.Hotkey, fallbackKey);
+    }
+
+    private void UpsertHotkey(HotkeyAction action, HotkeyBinding hotkey, string? presetPath)
+    {
+        var existingByAction = _hotkeys.FirstOrDefault(item => item.Action == action && action is HotkeyAction.EnableRecoil or HotkeyAction.DisableRecoil);
+        if (existingByAction is not null)
+        {
+            existingByAction.Hotkey = hotkey;
+            return;
+        }
+
+        var existingByHotkey = _hotkeys.FirstOrDefault(
+            item => item.Hotkey.Key == hotkey.Key && item.Hotkey.Modifiers == hotkey.Modifiers);
+        var normalizedPresetPath = string.IsNullOrWhiteSpace(presetPath) ? string.Empty : presetPath.Trim();
+        if (existingByHotkey is null)
+        {
+            _hotkeys.Add(new RuntimeHotkeyBinding
+            {
+                Hotkey = hotkey,
+                Action = action,
+                PresetPath = normalizedPresetPath,
+            });
+        }
+        else
+        {
+            existingByHotkey.Action = action;
+            existingByHotkey.PresetPath = normalizedPresetPath;
+        }
+    }
+
+    private void DeduplicateByHotkey(RuntimeHotkeyBinding selected)
+    {
+        var duplicates = _hotkeys
+            .Where(item => !ReferenceEquals(item, selected)
+                           && item.Hotkey.Key == selected.Hotkey.Key
+                           && item.Hotkey.Modifiers == selected.Hotkey.Modifiers)
+            .ToList();
+        foreach (var duplicate in duplicates)
+        {
+            _hotkeys.Remove(duplicate);
+        }
+    }
+
+    private void ResetPressedStates()
+    {
+        foreach (var hotkeyBinding in _hotkeys)
+        {
+            hotkeyBinding.IsPressed = false;
+        }
+    }
+
+    private void ExecuteHotkeyAction(RuntimeHotkeyBinding hotkeyBinding)
+    {
+        switch (hotkeyBinding.Action)
+        {
+            case HotkeyAction.PresetSelection:
+                if (string.IsNullOrWhiteSpace(hotkeyBinding.PresetPath) || !File.Exists(hotkeyBinding.PresetPath))
+                {
+                    return;
+                }
+
+                var preset = PresetIniSerializer.LoadFromFile(hotkeyBinding.PresetPath);
+                ApplyPreset(preset);
+                _lastPathCache.Save(hotkeyBinding.PresetPath);
+                pathValueLabel.Text = hotkeyBinding.PresetPath;
+                TrySendPresetToBluetooth();
+                SaveProfile();
+                break;
+            case HotkeyAction.EnableRecoil:
+                if (!_recoilTimer.Enabled)
+                {
+                    ApplyRecoilState(true);
+                    SaveProfile();
+                }
+
+                break;
+            case HotkeyAction.DisableRecoil:
+                if (_recoilTimer.Enabled)
+                {
+                    ApplyRecoilState(false);
+                    SaveProfile();
+                }
+
+                break;
+            case HotkeyAction.ToggleRecoil:
+                ApplyRecoilState(!_recoilTimer.Enabled);
+                SaveProfile();
+                break;
+            case HotkeyAction.IncreaseDown:
+                ApplyDirectionalStep(downSlider, 1);
+                break;
+            case HotkeyAction.DecreaseDown:
+                ApplyDirectionalStep(downSlider, -1);
+                break;
+            case HotkeyAction.IncreaseUp:
+                ApplyDirectionalStep(upSlider, 1);
+                break;
+            case HotkeyAction.DecreaseUp:
+                ApplyDirectionalStep(upSlider, -1);
+                break;
+            case HotkeyAction.IncreaseRight:
+                ApplyDirectionalStep(rightSlider, 1);
+                break;
+            case HotkeyAction.DecreaseRight:
+                ApplyDirectionalStep(rightSlider, -1);
+                break;
+            case HotkeyAction.IncreaseLeft:
+                ApplyDirectionalStep(leftSlider, 1);
+                break;
+            case HotkeyAction.DecreaseLeft:
+                ApplyDirectionalStep(leftSlider, -1);
+                break;
+        }
+    }
+
+    private void ApplyDirectionalStep(TrackBar slider, int step)
+    {
+        var updated = CoerceToRange(slider.Value + step, slider.Minimum, slider.Maximum);
+        if (updated == slider.Value)
+        {
+            return;
+        }
+
+        slider.Value = updated;
+        slider_ValueChanged(slider, EventArgs.Empty);
+    }
+
+    private static string EncodeHotkeyTarget(RuntimeHotkeyBinding binding)
+    {
+        return binding.Action == HotkeyAction.PresetSelection
+            ? binding.PresetPath
+            : $"{ActionTargetPrefix}{binding.Action}";
+    }
+
+    private static (HotkeyAction Action, string PresetPath) DecodeHotkeyTarget(string target)
+    {
+        if (target.StartsWith(ActionTargetPrefix, StringComparison.OrdinalIgnoreCase)
+            && Enum.TryParse<HotkeyAction>(target[ActionTargetPrefix.Length..], ignoreCase: true, out var action)
+            && action != HotkeyAction.PresetSelection)
+        {
+            return (action, string.Empty);
+        }
+
+        return (HotkeyAction.PresetSelection, target);
+    }
+
+    private static string GetActionDisplayText(RuntimeHotkeyBinding item)
+    {
+        return item.Action == HotkeyAction.PresetSelection
+            ? $"Preset: {Path.GetFileName(item.PresetPath)}"
+            : GetActionDisplayName(item.Action);
+    }
+
+    private static string GetActionDisplayName(HotkeyAction action)
+    {
+        return action switch
+        {
+            HotkeyAction.PresetSelection => "Preset selection",
+            HotkeyAction.EnableRecoil => "Enable recoil",
+            HotkeyAction.DisableRecoil => "Disable recoil",
+            HotkeyAction.ToggleRecoil => "Toggle recoil",
+            HotkeyAction.IncreaseDown => "Increase down value",
+            HotkeyAction.DecreaseDown => "Decrease down value",
+            HotkeyAction.IncreaseUp => "Increase up value",
+            HotkeyAction.DecreaseUp => "Decrease up value",
+            HotkeyAction.IncreaseRight => "Increase right value",
+            HotkeyAction.DecreaseRight => "Decrease right value",
+            HotkeyAction.IncreaseLeft => "Increase left value",
+            HotkeyAction.DecreaseLeft => "Decrease left value",
+            _ => action.ToString(),
+        };
     }
 
     private const uint MOUSEEVENTF_MOVE = 0x0001;
@@ -747,39 +901,13 @@ public partial class Form1 : Form
     private const int MinSupportedVirtualKey = 0x01; // Lowest Windows virtual-key code used by GetAsyncKeyState.
     private const int MaxSupportedVirtualKey = 0xFE; // Upper bound supported here; 0xFE (VK_PACKET) and 0xFF have special meanings.
     private static readonly Color AccentBorderColor = Color.FromArgb(80, 120, 191);
+    private const string ActionTargetPrefix = "__action__:";
 
     [DllImport("user32.dll")]
     private static extern short GetAsyncKeyState(int vKey);
 
     [DllImport("user32.dll")]
     private static extern void mouse_event(uint dwFlags, int dx, int dy, uint dwData, nuint dwExtraInfo);
-
-    private void OpenKeybindManager()
-    {
-        using var keybindsForm = new KeybindsForm(_enableHotkey, _disableHotkey, _presetHotkeys
-            .Select(item => new PresetHotkeyBinding
-            {
-                Hotkey = item.Hotkey,
-                PresetPath = item.PresetPath,
-            }));
-
-        if (keybindsForm.ShowDialog(this) != DialogResult.OK)
-        {
-            return;
-        }
-
-        _enableHotkey = NormalizeHotkey(keybindsForm.EnableHotkey, ProfileSettings.DefaultEnableHotkeyKey);
-        _disableHotkey = NormalizeHotkey(keybindsForm.DisableHotkey, ProfileSettings.DefaultDisableHotkeyKey);
-        _enableHotkeyPressed = false;
-        _disableHotkeyPressed = false;
-        _presetHotkeys.Clear();
-        _presetHotkeys.AddRange(keybindsForm.PresetHotkeys.Select(item => new RuntimePresetHotkey
-        {
-            Hotkey = NormalizeHotkey(item.Hotkey, fallbackKey: 0),
-            PresetPath = item.PresetPath,
-        }).Where(item => IsValidVirtualKey(item.Hotkey.Key)));
-        SaveProfile();
-    }
 
     private void ProcessHotkey(ref bool previousState, HotkeyBinding hotkey, Action onPressed)
     {
@@ -910,8 +1038,8 @@ public partial class Form1 : Form
         _tabs.ForeColor = Color.Gainsboro;
 
         ApplyThemeRecursive(this);
-        _presetHotkeysList.BackColor = Color.FromArgb(31, 38, 55);
-        _presetHotkeysList.ForeColor = Color.Gainsboro;
+        _hotkeysList.BackColor = Color.FromArgb(31, 38, 55);
+        _hotkeysList.ForeColor = Color.Gainsboro;
         foreach (TabPage page in _tabs.TabPages)
         {
             page.BackColor = Color.FromArgb(20, 24, 33);
@@ -949,11 +1077,170 @@ public partial class Form1 : Form
         }
     }
 
-    private sealed class RuntimePresetHotkey
+    private sealed class RuntimeHotkeyBinding
     {
-        public HotkeyBinding Hotkey { get; init; } = new();
-        public string PresetPath { get; init; } = string.Empty;
+        public HotkeyBinding Hotkey { get; set; } = new();
+        public HotkeyAction Action { get; set; } = HotkeyAction.PresetSelection;
+        public string PresetPath { get; set; } = string.Empty;
         public bool IsPressed;
+    }
+
+    private enum HotkeyAction
+    {
+        PresetSelection,
+        EnableRecoil,
+        DisableRecoil,
+        ToggleRecoil,
+        IncreaseDown,
+        DecreaseDown,
+        IncreaseUp,
+        DecreaseUp,
+        IncreaseRight,
+        DecreaseRight,
+        IncreaseLeft,
+        DecreaseLeft,
+    }
+
+    private sealed class HotkeyActionDialog : Form
+    {
+        private sealed record ActionOption(HotkeyAction Action, string Label);
+        private readonly List<ActionOption> _actionOptions =
+        [
+            new(HotkeyAction.PresetSelection, "Preset selection"),
+            new(HotkeyAction.EnableRecoil, "Enable recoil"),
+            new(HotkeyAction.DisableRecoil, "Disable recoil"),
+            new(HotkeyAction.ToggleRecoil, "Toggle recoil"),
+            new(HotkeyAction.IncreaseDown, "Increase down value"),
+            new(HotkeyAction.DecreaseDown, "Decrease down value"),
+            new(HotkeyAction.IncreaseUp, "Increase up value"),
+            new(HotkeyAction.DecreaseUp, "Decrease up value"),
+            new(HotkeyAction.IncreaseRight, "Increase right value"),
+            new(HotkeyAction.DecreaseRight, "Decrease right value"),
+            new(HotkeyAction.IncreaseLeft, "Increase left value"),
+            new(HotkeyAction.DecreaseLeft, "Decrease left value"),
+        ];
+        private readonly ComboBox _actionCombo = new();
+        private readonly TextBox _presetPathTextBox = new();
+        private readonly Button _browseButton = new();
+        private readonly Label _presetPathLabel = new();
+
+        public HotkeyAction SelectedAction => (_actionCombo.SelectedItem as ActionOption)?.Action ?? HotkeyAction.PresetSelection;
+        public string SelectedPresetPath => _presetPathTextBox.Text.Trim();
+
+        public HotkeyActionDialog()
+        {
+            Text = "Select hotkey action";
+            FormBorderStyle = FormBorderStyle.FixedDialog;
+            MaximizeBox = false;
+            MinimizeBox = false;
+            StartPosition = FormStartPosition.CenterParent;
+            ClientSize = new Size(500, 200);
+            BackColor = Color.FromArgb(20, 24, 33);
+            ForeColor = Color.Gainsboro;
+
+            var actionLabel = new Label
+            {
+                AutoSize = true,
+                Location = new Point(16, 20),
+                Text = "Action",
+                ForeColor = Color.Gainsboro,
+            };
+            _actionCombo.DropDownStyle = ComboBoxStyle.DropDownList;
+            _actionCombo.Location = new Point(16, 45);
+            _actionCombo.Size = new Size(468, 28);
+            _actionCombo.DisplayMember = nameof(ActionOption.Label);
+            _actionCombo.Items.AddRange(_actionOptions.Cast<object>().ToArray());
+            _actionCombo.SelectedItem = _actionOptions[0];
+            _actionCombo.SelectedIndexChanged += (_, _) => TogglePresetPathInput();
+
+            _presetPathLabel.AutoSize = true;
+            _presetPathLabel.Location = new Point(16, 86);
+            _presetPathLabel.Text = "Preset file";
+            _presetPathLabel.ForeColor = Color.Gainsboro;
+
+            _presetPathTextBox.Location = new Point(16, 111);
+            _presetPathTextBox.Size = new Size(364, 27);
+            _presetPathTextBox.BackColor = Color.FromArgb(31, 38, 55);
+            _presetPathTextBox.ForeColor = Color.Gainsboro;
+            _presetPathTextBox.BorderStyle = BorderStyle.FixedSingle;
+
+            _browseButton.Location = new Point(388, 108);
+            _browseButton.Size = new Size(96, 32);
+            _browseButton.Text = "Browse";
+            _browseButton.FlatStyle = FlatStyle.Flat;
+            _browseButton.BackColor = Color.FromArgb(31, 38, 55);
+            _browseButton.ForeColor = Color.Gainsboro;
+            _browseButton.FlatAppearance.BorderColor = AccentBorderColor;
+            _browseButton.Click += (_, _) => BrowsePresetPath();
+
+            var saveButton = new Button
+            {
+                DialogResult = DialogResult.OK,
+                Location = new Point(298, 156),
+                Size = new Size(90, 32),
+                Text = "Continue",
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(31, 38, 55),
+                ForeColor = Color.Gainsboro,
+            };
+            saveButton.FlatAppearance.BorderColor = AccentBorderColor;
+            saveButton.Click += (_, e) =>
+            {
+                if (SelectedAction == HotkeyAction.PresetSelection
+                    && (string.IsNullOrWhiteSpace(SelectedPresetPath) || !File.Exists(SelectedPresetPath)))
+                {
+                    MessageBox.Show(this, "Select a valid preset INI file for preset selection.", "NoRecoil", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    DialogResult = DialogResult.None;
+                }
+            };
+
+            var cancelButton = new Button
+            {
+                DialogResult = DialogResult.Cancel,
+                Location = new Point(394, 156),
+                Size = new Size(90, 32),
+                Text = "Cancel",
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(31, 38, 55),
+                ForeColor = Color.Gainsboro,
+            };
+            cancelButton.FlatAppearance.BorderColor = AccentBorderColor;
+
+            Controls.Add(actionLabel);
+            Controls.Add(_actionCombo);
+            Controls.Add(_presetPathLabel);
+            Controls.Add(_presetPathTextBox);
+            Controls.Add(_browseButton);
+            Controls.Add(saveButton);
+            Controls.Add(cancelButton);
+            AcceptButton = saveButton;
+            CancelButton = cancelButton;
+
+            TogglePresetPathInput();
+        }
+
+        private void TogglePresetPathInput()
+        {
+            var isPresetSelection = SelectedAction == HotkeyAction.PresetSelection;
+            _presetPathLabel.Visible = isPresetSelection;
+            _presetPathTextBox.Visible = isPresetSelection;
+            _browseButton.Visible = isPresetSelection;
+        }
+
+        private void BrowsePresetPath()
+        {
+            using var dialog = new OpenFileDialog
+            {
+                Filter = "INI files (*.ini)|*.ini|All files (*.*)|*.*",
+                DefaultExt = "ini",
+                CheckFileExists = true,
+            };
+
+            if (dialog.ShowDialog(this) == DialogResult.OK)
+            {
+                _presetPathTextBox.Text = dialog.FileName;
+            }
+        }
     }
 
     private sealed class HotkeyCaptureDialog : Form
