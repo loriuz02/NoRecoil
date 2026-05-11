@@ -42,10 +42,10 @@ public static class ProfileIniSerializer
             var key = rawLine[..separator].Trim();
             if (key.StartsWith("PresetHotkey", StringComparison.OrdinalIgnoreCase))
             {
-                var valueText = separator == rawLine.Length - 1 ? string.Empty : rawLine[(separator + 1)..].Trim();
-                if (!string.IsNullOrWhiteSpace(valueText))
+                var presetValueText = separator == rawLine.Length - 1 ? string.Empty : rawLine[(separator + 1)..].Trim();
+                if (!string.IsNullOrWhiteSpace(presetValueText))
                 {
-                    presetHotkeyEntries.Add(valueText);
+                    presetHotkeyEntries.Add(presetValueText);
                 }
 
                 continue;

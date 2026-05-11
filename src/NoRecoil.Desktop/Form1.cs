@@ -624,6 +624,6 @@ public partial class Form1 : Form
     {
         public HotkeyBinding Hotkey { get; init; } = new();
         public string PresetPath { get; init; } = string.Empty;
-        public bool IsPressed { get; set; }
+        public bool IsPressed;
     }
 }
