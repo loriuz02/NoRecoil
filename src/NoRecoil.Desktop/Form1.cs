@@ -19,10 +19,24 @@ public partial class Form1 : Form
     private readonly List<RuntimePresetHotkey> _presetHotkeys = [];
     private bool _enableHotkeyPressed;
     private bool _disableHotkeyPressed;
+    private readonly TabControl _tabs = new();
+    private readonly TabPage _mainTab = new("🎯 Main");
+    private readonly TabPage _keybindsTab = new("⌨️ Keybinds");
+    private readonly TabPage _bluetoothTab = new("📶 Bluetooth");
+    private readonly Label _keybindHintLabel = new();
+    private readonly Label _presetHotkeysLabel = new();
+    private readonly ListBox _presetHotkeysList = new();
+    private readonly Button _setEnableHotkeyButton = new();
+    private readonly Button _setDisableHotkeyButton = new();
+    private readonly Button _addPresetHotkeyButton = new();
+    private readonly Button _removePresetHotkeyButton = new();
 
     public Form1()
     {
         InitializeComponent();
+        InitializeTabbedLayout();
+        InitializeKeybindsTab();
+        ApplyEmojiText();
 
         _recoilTimer.Interval = 10;
         _recoilTimer.Tick += RecoilTimerOnTick;
@@ -53,14 +67,20 @@ public partial class Form1 : Form
         SaveProfile();
     }
 
-    private void setEnableHotkeyButton_Click(object sender, EventArgs e)
+    private void setEnableHotkeyButton_Click(object? sender, EventArgs e)
     {
-        OpenKeybindManager();
+        CaptureAndApplyHotkey(
+            "Configure enable hotkey",
+            "⌨️ Press the key combination to enable recoil",
+            binding => _enableHotkey = binding);
     }
 
-    private void setDisableHotkeyButton_Click(object sender, EventArgs e)
+    private void setDisableHotkeyButton_Click(object? sender, EventArgs e)
     {
-        OpenKeybindManager();
+        CaptureAndApplyHotkey(
+            "Configure disable hotkey",
+            "⌨️ Press the key combination to disable recoil",
+            binding => _disableHotkey = binding);
     }
 
     private void requireRightMouseCheckbox_CheckedChanged(object sender, EventArgs e)
@@ -157,8 +177,8 @@ public partial class Form1 : Form
             _serialPort.DataReceived += SerialPortOnDataReceived;
             _serialPort.Open();
 
-            bluetoothStatusValueLabel.Text = "Connected";
-            connectBluetoothButton.Text = "Disconnect";
+            bluetoothStatusValueLabel.Text = "🟢 Connected";
+            connectBluetoothButton.Text = "🔌 Disconnect";
 
             TrySendPresetToBluetooth();
             SaveProfile();
@@ -282,8 +302,8 @@ public partial class Form1 : Form
     private void ApplyRecoilState(bool enabled)
     {
         _recoilTimer.Enabled = enabled;
-        statusValueLabel.Text = enabled ? "Enabled" : "Disabled";
-        toggleRecoilButton.Text = enabled ? "Toggle recoil (disable)" : "Toggle recoil (enable)";
+        statusValueLabel.Text = enabled ? "🟢 Active" : "🔴 Not Active";
+        toggleRecoilButton.Text = enabled ? "🛑 Disable recoil" : "🎯 Enable recoil";
     }
 
     private ProfileSettings BuildProfileSettings() => new()
@@ -295,6 +315,7 @@ public partial class Form1 : Form
         EnableHotkey = _enableHotkey,
         DisableHotkey = _disableHotkey,
         PresetHotkeys = _presetHotkeys
+            .Take(ProfileSettings.MaxPresetHotkeys)
             .Select(item => new PresetHotkeyBinding
             {
                 Hotkey = item.Hotkey,
@@ -315,7 +336,7 @@ public partial class Form1 : Form
             _enableHotkey = NormalizeHotkey(settings.EnableHotkey, ProfileSettings.DefaultEnableHotkeyKey);
             _disableHotkey = NormalizeHotkey(settings.DisableHotkey, ProfileSettings.DefaultDisableHotkeyKey);
             _presetHotkeys.Clear();
-            foreach (var item in settings.PresetHotkeys)
+            foreach (var item in settings.PresetHotkeys.Take(ProfileSettings.MaxPresetHotkeys))
             {
                 if (string.IsNullOrWhiteSpace(item.PresetPath))
                 {
@@ -334,6 +355,9 @@ public partial class Form1 : Form
                     PresetPath = item.PresetPath,
                 });
             }
+
+            RefreshPresetHotkeyList();
+            UpdateKeybindButtonLabels();
         }
         finally
         {
@@ -477,8 +501,8 @@ public partial class Form1 : Form
             }
         }
 
-        connectBluetoothButton.Text = "Connect";
-        bluetoothStatusValueLabel.Text = "Disconnected";
+        connectBluetoothButton.Text = "🔗 Connect";
+        bluetoothStatusValueLabel.Text = "🔴 Disconnected";
         SaveProfile();
     }
 
@@ -489,6 +513,231 @@ public partial class Form1 : Form
         base.OnFormClosing(e);
     }
 
+    private void InitializeTabbedLayout()
+    {
+        _tabs.Dock = DockStyle.Fill;
+        _tabs.Padding = new Point(20, 6);
+        _tabs.Multiline = false;
+
+        _tabs.TabPages.Add(_mainTab);
+        _tabs.TabPages.Add(_keybindsTab);
+        _tabs.TabPages.Add(_bluetoothTab);
+        Controls.Add(_tabs);
+
+        foreach (var control in new Control[]
+                 {
+                     rightSlider,
+                     downSlider,
+                     leftSlider,
+                     upSlider,
+                     delaySlider,
+                     rightLabel,
+                     downLabel,
+                     leftLabel,
+                     upLabel,
+                     delayLabel,
+                     rightValueLabel,
+                     downValueLabel,
+                     leftValueLabel,
+                     upValueLabel,
+                     delayValueLabel,
+                     saveButton,
+                     loadButton,
+                     toggleRecoilButton,
+                     requireRightMouseCheckbox,
+                     statusLabel,
+                     statusValueLabel,
+                     pathLabel,
+                     pathValueLabel,
+                 })
+        {
+            _mainTab.Controls.Add(control);
+        }
+
+        foreach (var control in new Control[]
+                 {
+                     bluetoothPortLabel,
+                     bluetoothPortTextbox,
+                     connectBluetoothButton,
+                     bluetoothStatusLabel,
+                     bluetoothStatusValueLabel,
+                 })
+        {
+            _bluetoothTab.Controls.Add(control);
+        }
+
+        manageKeybindsButton.Visible = false;
+        manageKeybindsButton.Enabled = false;
+
+        bluetoothPortLabel.Location = new Point(20, 30);
+        bluetoothPortTextbox.Location = new Point(145, 27);
+        connectBluetoothButton.Location = new Point(255, 24);
+        bluetoothStatusLabel.Location = new Point(20, 74);
+        bluetoothStatusValueLabel.Location = new Point(102, 74);
+    }
+
+    private void InitializeKeybindsTab()
+    {
+        _setEnableHotkeyButton.Location = new Point(20, 22);
+        _setEnableHotkeyButton.Size = new Size(290, 36);
+        _setEnableHotkeyButton.Click += setEnableHotkeyButton_Click;
+
+        _setDisableHotkeyButton.Location = new Point(326, 22);
+        _setDisableHotkeyButton.Size = new Size(290, 36);
+        _setDisableHotkeyButton.Click += setDisableHotkeyButton_Click;
+
+        _keybindHintLabel.Location = new Point(20, 66);
+        _keybindHintLabel.Size = new Size(596, 24);
+        _keybindHintLabel.Text = "💡 Configure enable/disable recoil and preset shortcuts.";
+
+        _presetHotkeysLabel.AutoSize = true;
+        _presetHotkeysLabel.Location = new Point(20, 102);
+        _presetHotkeysLabel.Text = "🎮 Preset hotkeys (max 20)";
+
+        _presetHotkeysList.Location = new Point(20, 128);
+        _presetHotkeysList.Size = new Size(596, 184);
+        _presetHotkeysList.Format += (_, args) =>
+        {
+            if (args.ListItem is RuntimePresetHotkey item)
+            {
+                var fileName = Path.GetFileName(item.PresetPath);
+                args.Value = $"{FormatHotkey(item.Hotkey)} ➜ {fileName}";
+            }
+        };
+
+        _addPresetHotkeyButton.Location = new Point(20, 324);
+        _addPresetHotkeyButton.Size = new Size(190, 36);
+        _addPresetHotkeyButton.Text = "➕ Add preset hotkey";
+        _addPresetHotkeyButton.Click += (_, _) => AddPresetHotkey();
+
+        _removePresetHotkeyButton.Location = new Point(220, 324);
+        _removePresetHotkeyButton.Size = new Size(190, 36);
+        _removePresetHotkeyButton.Text = "➖ Remove selected";
+        _removePresetHotkeyButton.Click += (_, _) => RemoveSelectedPresetHotkey();
+
+        _keybindsTab.Controls.Add(_setEnableHotkeyButton);
+        _keybindsTab.Controls.Add(_setDisableHotkeyButton);
+        _keybindsTab.Controls.Add(_keybindHintLabel);
+        _keybindsTab.Controls.Add(_presetHotkeysLabel);
+        _keybindsTab.Controls.Add(_presetHotkeysList);
+        _keybindsTab.Controls.Add(_addPresetHotkeyButton);
+        _keybindsTab.Controls.Add(_removePresetHotkeyButton);
+
+        UpdateKeybindButtonLabels();
+        RefreshPresetHotkeyList();
+    }
+
+    private void ApplyEmojiText()
+    {
+        Text = "NoRecoil ✨ Controller";
+        saveButton.Text = "💾 Save preset";
+        loadButton.Text = "📂 Load preset";
+        requireRightMouseCheckbox.Text = "🖱️ Require right mouse together with left";
+        statusLabel.Text = "Recoil:";
+        pathLabel.Text = "🗂️ Last path:";
+        bluetoothPortLabel.Text = "🔌 Bluetooth COM";
+        bluetoothPortTextbox.PlaceholderText = "COM5";
+        connectBluetoothButton.Text = "🔗 Connect";
+        bluetoothStatusLabel.Text = "Status:";
+        bluetoothStatusValueLabel.Text = "🔴 Disconnected";
+        UpdateKeybindButtonLabels();
+    }
+
+    private void UpdateKeybindButtonLabels()
+    {
+        _setEnableHotkeyButton.Text = $"✅ Enable hotkey ({FormatHotkey(_enableHotkey)})";
+        _setDisableHotkeyButton.Text = $"⛔ Disable hotkey ({FormatHotkey(_disableHotkey)})";
+    }
+
+    private void RefreshPresetHotkeyList()
+    {
+        _presetHotkeysList.Items.Clear();
+        foreach (var presetHotkey in _presetHotkeys.OrderBy(hotkey => hotkey.Hotkey.Modifiers).ThenBy(hotkey => hotkey.Hotkey.Key))
+        {
+            _presetHotkeysList.Items.Add(presetHotkey);
+        }
+    }
+
+    private void AddPresetHotkey()
+    {
+        if (_presetHotkeys.Count >= ProfileSettings.MaxPresetHotkeys)
+        {
+            MessageBox.Show(
+                this,
+                $"You can configure up to {ProfileSettings.MaxPresetHotkeys} preset hotkeys.",
+                "NoRecoil",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+            return;
+        }
+
+        using var dialog = new OpenFileDialog
+        {
+            Filter = "INI files (*.ini)|*.ini|All files (*.*)|*.*",
+            DefaultExt = "ini",
+            CheckFileExists = true,
+        };
+
+        SetInitialDirectory(dialog);
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+
+        CaptureAndApplyHotkey(
+            "Configure preset hotkey",
+            "⌨️ Press the key combination to load the selected preset",
+            binding =>
+            {
+                var existing = _presetHotkeys.FirstOrDefault(
+                    item => item.Hotkey.Key == binding.Key && item.Hotkey.Modifiers == binding.Modifiers);
+
+                var updated = new RuntimePresetHotkey
+                {
+                    Hotkey = binding,
+                    PresetPath = dialog.FileName,
+                };
+
+                if (existing is null)
+                {
+                    _presetHotkeys.Add(updated);
+                }
+                else
+                {
+                    var index = _presetHotkeys.IndexOf(existing);
+                    _presetHotkeys[index] = updated;
+                }
+            });
+    }
+
+    private void RemoveSelectedPresetHotkey()
+    {
+        if (_presetHotkeysList.SelectedItem is not RuntimePresetHotkey selected)
+        {
+            return;
+        }
+
+        _presetHotkeys.Remove(selected);
+        RefreshPresetHotkeyList();
+        SaveProfile();
+    }
+
+    private void CaptureAndApplyHotkey(string title, string prompt, Action<HotkeyBinding> apply)
+    {
+        using var dialog = new HotkeyCaptureDialog(title, prompt);
+        if (dialog.ShowDialog(this) != DialogResult.OK || dialog.CapturedHotkey is null)
+        {
+            return;
+        }
+
+        apply(dialog.CapturedHotkey);
+        _enableHotkeyPressed = false;
+        _disableHotkeyPressed = false;
+        UpdateKeybindButtonLabels();
+        RefreshPresetHotkeyList();
+        SaveProfile();
+    }
+
     private const uint MOUSEEVENTF_MOVE = 0x0001;
     private const int VK_LBUTTON = 0x01;
     private const int VK_RBUTTON = 0x02;
@@ -497,6 +746,7 @@ public partial class Form1 : Form
     private const int VK_MENU = 0x12;
     private const int MinSupportedVirtualKey = 0x01; // Lowest Windows virtual-key code used by GetAsyncKeyState.
     private const int MaxSupportedVirtualKey = 0xFE; // Upper bound supported here; 0xFE (VK_PACKET) and 0xFF have special meanings.
+    private static readonly Color AccentBorderColor = Color.FromArgb(80, 120, 191);
 
     [DllImport("user32.dll")]
     private static extern short GetAsyncKeyState(int vKey);
@@ -593,30 +843,109 @@ public partial class Form1 : Form
 
     private static bool IsVirtualKeyPressed(int key) => (GetAsyncKeyState(key) & 0x8000) != 0;
 
+    private static HotkeyBinding? BuildHotkeyBinding(KeyEventArgs e)
+    {
+        var key = (int)e.KeyCode;
+        if (key is (int)Keys.ShiftKey or (int)Keys.ControlKey or (int)Keys.Menu)
+        {
+            return null;
+        }
+
+        if (!IsValidVirtualKey(key))
+        {
+            return null;
+        }
+
+        var modifiers = HotkeyModifiers.None;
+        if (e.Control)
+        {
+            modifiers |= HotkeyModifiers.Control;
+        }
+
+        if (e.Alt)
+        {
+            modifiers |= HotkeyModifiers.Alt;
+        }
+
+        if (e.Shift)
+        {
+            modifiers |= HotkeyModifiers.Shift;
+        }
+
+        return new HotkeyBinding
+        {
+            Key = key,
+            Modifiers = modifiers,
+        };
+    }
+
+    private static string FormatHotkey(HotkeyBinding hotkey)
+    {
+        var parts = new List<string>();
+        if (hotkey.Modifiers.HasFlag(HotkeyModifiers.Control))
+        {
+            parts.Add("Ctrl");
+        }
+
+        if (hotkey.Modifiers.HasFlag(HotkeyModifiers.Alt))
+        {
+            parts.Add("Alt");
+        }
+
+        if (hotkey.Modifiers.HasFlag(HotkeyModifiers.Shift))
+        {
+            parts.Add("Shift");
+        }
+
+        parts.Add(((Keys)hotkey.Key).ToString());
+        return string.Join("+", parts);
+    }
+
     private void ApplyModernTheme()
     {
         BackColor = Color.FromArgb(20, 24, 33);
         ForeColor = Color.Gainsboro;
 
-        foreach (var button in Controls.OfType<Button>())
-        {
-            button.FlatStyle = FlatStyle.Flat;
-            button.FlatAppearance.BorderColor = Color.FromArgb(64, 95, 152);
-            button.FlatAppearance.MouseOverBackColor = Color.FromArgb(42, 52, 76);
-            button.BackColor = Color.FromArgb(31, 38, 55);
-            button.ForeColor = Color.Gainsboro;
-        }
+        _tabs.BackColor = Color.FromArgb(24, 29, 40);
+        _tabs.ForeColor = Color.Gainsboro;
 
-        foreach (var textBox in Controls.OfType<TextBox>())
+        ApplyThemeRecursive(this);
+        _presetHotkeysList.BackColor = Color.FromArgb(31, 38, 55);
+        _presetHotkeysList.ForeColor = Color.Gainsboro;
+        foreach (TabPage page in _tabs.TabPages)
         {
-            textBox.BackColor = Color.FromArgb(31, 38, 55);
-            textBox.ForeColor = Color.Gainsboro;
-            textBox.BorderStyle = BorderStyle.FixedSingle;
+            page.BackColor = Color.FromArgb(20, 24, 33);
+            page.ForeColor = Color.Gainsboro;
         }
+    }
 
-        foreach (var label in Controls.OfType<Label>())
+    private static void ApplyThemeRecursive(Control root)
+    {
+        foreach (Control control in root.Controls)
         {
-            label.ForeColor = Color.Gainsboro;
+            switch (control)
+            {
+                case Button button:
+                    button.FlatStyle = FlatStyle.Flat;
+                    button.FlatAppearance.BorderColor = AccentBorderColor;
+                    button.FlatAppearance.MouseOverBackColor = Color.FromArgb(42, 52, 76);
+                    button.BackColor = Color.FromArgb(31, 38, 55);
+                    button.ForeColor = Color.Gainsboro;
+                    break;
+                case TextBox textBox:
+                    textBox.BackColor = Color.FromArgb(31, 38, 55);
+                    textBox.ForeColor = Color.Gainsboro;
+                    textBox.BorderStyle = BorderStyle.FixedSingle;
+                    break;
+                case Label label:
+                    label.ForeColor = Color.Gainsboro;
+                    break;
+                case CheckBox checkBox:
+                    checkBox.ForeColor = Color.Gainsboro;
+                    break;
+            }
+
+            ApplyThemeRecursive(control);
         }
     }
 
@@ -625,5 +954,74 @@ public partial class Form1 : Form
         public HotkeyBinding Hotkey { get; init; } = new();
         public string PresetPath { get; init; } = string.Empty;
         public bool IsPressed;
+    }
+
+    private sealed class HotkeyCaptureDialog : Form
+    {
+        public HotkeyBinding? CapturedHotkey { get; private set; }
+
+        public HotkeyCaptureDialog(string title, string prompt)
+        {
+            Text = title;
+            KeyPreview = true;
+            FormBorderStyle = FormBorderStyle.FixedDialog;
+            MaximizeBox = false;
+            MinimizeBox = false;
+            StartPosition = FormStartPosition.CenterParent;
+            ClientSize = new Size(440, 150);
+            BackColor = Color.FromArgb(20, 24, 33);
+            ForeColor = Color.Gainsboro;
+
+            var promptLabel = new Label
+            {
+                AutoSize = false,
+                Location = new Point(16, 18),
+                Size = new Size(408, 48),
+                Text = prompt,
+                ForeColor = Color.Gainsboro,
+            };
+
+            var waitingLabel = new Label
+            {
+                AutoSize = false,
+                Location = new Point(16, 68),
+                Size = new Size(408, 24),
+                Text = "🕒 Waiting for key combination...",
+                ForeColor = Color.LightSkyBlue,
+            };
+
+            var cancelButton = new Button
+            {
+                DialogResult = DialogResult.Cancel,
+                Location = new Point(316, 104),
+                Size = new Size(108, 30),
+                Text = "Cancel",
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(31, 38, 55),
+                ForeColor = Color.Gainsboro,
+            };
+            cancelButton.FlatAppearance.BorderColor = AccentBorderColor;
+
+            Controls.Add(promptLabel);
+            Controls.Add(waitingLabel);
+            Controls.Add(cancelButton);
+            CancelButton = cancelButton;
+
+            KeyDown += OnCaptureKeyDown;
+        }
+
+        private void OnCaptureKeyDown(object? sender, KeyEventArgs e)
+        {
+            var binding = BuildHotkeyBinding(e);
+            if (binding is null)
+            {
+                return;
+            }
+
+            CapturedHotkey = binding;
+            e.SuppressKeyPress = true;
+            DialogResult = DialogResult.OK;
+            Close();
+        }
     }
 }

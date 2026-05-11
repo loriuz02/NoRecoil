@@ -119,4 +119,60 @@ public class ProfileIniSerializerTests
         Assert.Contains("DisableHotkey=Alt+Shift+115", ini);
         Assert.Contains(@"PresetHotkey1=Shift+56|C:\presets\ak.ini", ini);
     }
+
+    [Fact]
+    public void Parse_LimitsPresetHotkeysToMax()
+    {
+        const int excessivePresetHotkeyCount = ProfileSettings.MaxPresetHotkeys + 5;
+        var lines = new List<string>
+        {
+            "[Profile]",
+            "Right=1",
+        };
+
+        for (var i = 1; i <= excessivePresetHotkeyCount; i++)
+        {
+            lines.Add($"PresetHotkey{i}=Ctrl+{80 + i}|C:\\presets\\preset{i}.ini");
+        }
+
+        var settings = ProfileIniSerializer.Parse(string.Join(Environment.NewLine, lines));
+
+        Assert.Equal(ProfileSettings.MaxPresetHotkeys, settings.PresetHotkeys.Count);
+        Assert.Equal(@"C:\presets\preset1.ini", settings.PresetHotkeys[0].PresetPath);
+        Assert.Equal(@"C:\presets\preset20.ini", settings.PresetHotkeys[^1].PresetPath);
+    }
+
+    [Fact]
+    public void Serialize_LimitsPresetHotkeysToMax()
+    {
+        const int excessivePresetHotkeyCount = ProfileSettings.MaxPresetHotkeys + 5;
+        var presetHotkeys = Enumerable.Range(1, excessivePresetHotkeyCount)
+            .Select(i => new PresetHotkeyBinding
+            {
+                Hotkey = new HotkeyBinding
+                {
+                    Key = 40 + i,
+                    Modifiers = HotkeyModifiers.Control,
+                },
+                PresetPath = $@"C:\presets\preset{i}.ini",
+            })
+            .ToArray();
+
+        var settings = new ProfileSettings
+        {
+            Preset = new RecoilPreset(),
+            PresetHotkeys = presetHotkeys,
+        };
+
+        var ini = ProfileIniSerializer.Serialize(settings, includeSectionHeader: true);
+
+        var presetLines = ini
+            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+            .Where(line => line.StartsWith("PresetHotkey", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        Assert.Equal(ProfileSettings.MaxPresetHotkeys, presetLines.Length);
+        Assert.Contains(@"PresetHotkey20=Ctrl+60|C:\presets\preset20.ini", presetLines);
+        Assert.DoesNotContain(presetLines, line => line.StartsWith("PresetHotkey21=", StringComparison.OrdinalIgnoreCase));
+    }
 }

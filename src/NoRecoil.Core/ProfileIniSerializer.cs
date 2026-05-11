@@ -109,7 +109,8 @@ public static class ProfileIniSerializer
         output.AppendLine($"EnableHotkey={HotkeyBindingSerializer.Serialize(settings.EnableHotkey)}");
         output.AppendLine($"DisableHotkey={HotkeyBindingSerializer.Serialize(settings.DisableHotkey)}");
 
-        for (var i = 0; i < settings.PresetHotkeys.Count; i++)
+        var maxPresetHotkeys = Math.Min(settings.PresetHotkeys.Count, ProfileSettings.MaxPresetHotkeys);
+        for (var i = 0; i < maxPresetHotkeys; i++)
         {
             var entry = settings.PresetHotkeys[i];
             var hotkey = HotkeyBindingSerializer.Serialize(entry.Hotkey);
@@ -175,6 +176,11 @@ public static class ProfileIniSerializer
         var parsed = new List<PresetHotkeyBinding>();
         foreach (var entry in entries)
         {
+            if (parsed.Count >= ProfileSettings.MaxPresetHotkeys)
+            {
+                break;
+            }
+
             var separator = entry.IndexOf('|');
             if (separator <= 0 || separator == entry.Length - 1)
             {

@@ -4,6 +4,7 @@ public sealed class ProfileSettings
 {
     public const int DefaultEnableHotkeyKey = 0x70; // F1
     public const int DefaultDisableHotkeyKey = 0x71; // F2
+    public const int MaxPresetHotkeys = 20;
 
     public RecoilPreset Preset { get; init; } = new();
     public bool RecoilEnabled { get; init; }
