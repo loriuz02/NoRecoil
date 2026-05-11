@@ -14,45 +14,130 @@ namespace NoRecoil.Desktop;
 
 public partial class MainWindow : Window
 {
+    private sealed record HotkeyActionOption(HotkeyAction Action, string Label);
+
+    private enum NavigationPage
+    {
+        Main,
+        Keybinds,
+        Bluetooth,
+    }
+
     private readonly LastPathCache _lastPathCache = new();
     private readonly string _profilePath = Path.Combine(AppContext.BaseDirectory, "profile.ini");
     private readonly DispatcherTimer _recoilTimer = new();
     private readonly DispatcherTimer _hotkeyTimer = new();
     private readonly StringBuilder _bluetoothBuffer = new();
     private readonly List<RuntimeHotkeyBinding> _hotkeys = [];
+    private readonly List<HotkeyActionOption> _hotkeyActionOptions;
     private SerialPort? _serialPort;
+    private bool _isInitializing;
     private bool _applyingProfile;
 
     public MainWindow()
     {
         InitializeComponent();
 
-        _recoilTimer.Interval = TimeSpan.FromMilliseconds(10);
-        _recoilTimer.Tick += RecoilTimerOnTick;
-
-        _hotkeyTimer.Interval = TimeSpan.FromMilliseconds(25);
-        _hotkeyTimer.Tick += HotkeyTimerOnTick;
-        _hotkeyTimer.Start();
-
-        ApplyPreset(new RecoilPreset());
-        ApplyRecoilState(false);
-        RequireRightMouseCheckBox.IsChecked = true;
-        BluetoothPortTextBox.Text = "COM5";
-
-        EnsureDefaultHotkeys();
-        RefreshHotkeyList();
-        LoadProfile();
-
-        var lastPath = _lastPathCache.Load();
-        if (!string.IsNullOrWhiteSpace(lastPath) && File.Exists(lastPath))
+        _isInitializing = true;
+        try
         {
-            var resolvedPath = lastPath.Trim();
-            ApplyPreset(PresetIniSerializer.LoadFromFile(resolvedPath));
-            LastPathText.Text = resolvedPath;
-        }
+            _hotkeyActionOptions = Enum.GetValues<HotkeyAction>()
+                .Select(action => new HotkeyActionOption(action, GetActionDisplayName(action)))
+                .ToList();
+            InitializeHotkeyActionEditor();
+            SetActivePage(NavigationPage.Main);
 
-        UpdateDelayLabel();
-        SetBluetoothState(isConnected: false);
+            _recoilTimer.Interval = TimeSpan.FromMilliseconds(10);
+            _recoilTimer.Tick += RecoilTimerOnTick;
+
+            _hotkeyTimer.Interval = TimeSpan.FromMilliseconds(25);
+            _hotkeyTimer.Tick += HotkeyTimerOnTick;
+            _hotkeyTimer.Start();
+
+            ApplyPreset(new RecoilPreset());
+            ApplyRecoilState(false);
+            RequireRightMouseCheckBox.IsChecked = true;
+            BluetoothPortTextBox.Text = "COM5";
+
+            EnsureDefaultHotkeys();
+            RefreshHotkeyList();
+            LoadProfile();
+
+            var lastPath = _lastPathCache.Load();
+            if (!string.IsNullOrWhiteSpace(lastPath) && File.Exists(lastPath))
+            {
+                var resolvedPath = lastPath.Trim();
+                ApplyPreset(PresetIniSerializer.LoadFromFile(resolvedPath));
+                LastPathText.Text = resolvedPath;
+            }
+
+            UpdateDelayLabel();
+            SetBluetoothState(isConnected: false);
+        }
+        finally
+        {
+            _isInitializing = false;
+        }
+    }
+
+    private HotkeyAction SelectedHotkeyAction => (HotkeyActionComboBox.SelectedItem as HotkeyActionOption)?.Action ?? HotkeyAction.PresetSelection;
+
+    private string SelectedHotkeyPresetPath => HotkeyPresetPathTextBox.Text.Trim();
+
+    private void InitializeHotkeyActionEditor()
+    {
+        HotkeyActionComboBox.ItemsSource = _hotkeyActionOptions;
+        HotkeyActionComboBox.SelectedIndex = 0;
+        ToggleHotkeyPresetRowVisibility();
+        SetHotkeyActionEditorVisibility(false);
+    }
+
+    private void SetHotkeyActionEditorVisibility(bool isVisible)
+    {
+        HotkeyActionPanel.Visibility = isVisible ? Visibility.Visible : Visibility.Collapsed;
+        AddHotkeyButton.IsEnabled = !isVisible;
+        EditHotkeyButton.IsEnabled = !isVisible;
+        RemoveHotkeyButton.IsEnabled = !isVisible;
+    }
+
+    private void ToggleHotkeyPresetRowVisibility()
+    {
+        HotkeyPresetRow.Visibility = SelectedHotkeyAction == HotkeyAction.PresetSelection
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    private void MainNavButton_Click(object sender, RoutedEventArgs e)
+    {
+        SetActivePage(NavigationPage.Main);
+    }
+
+    private void KeybindsNavButton_Click(object sender, RoutedEventArgs e)
+    {
+        SetActivePage(NavigationPage.Keybinds);
+    }
+
+    private void BluetoothNavButton_Click(object sender, RoutedEventArgs e)
+    {
+        SetActivePage(NavigationPage.Bluetooth);
+    }
+
+    private void SetActivePage(NavigationPage page)
+    {
+        MainPagePanel.Visibility = page == NavigationPage.Main ? Visibility.Visible : Visibility.Collapsed;
+        KeybindsPagePanel.Visibility = page == NavigationPage.Keybinds ? Visibility.Visible : Visibility.Collapsed;
+        BluetoothPagePanel.Visibility = page == NavigationPage.Bluetooth ? Visibility.Visible : Visibility.Collapsed;
+
+        ApplyNavButtonState(MainNavButton, page == NavigationPage.Main);
+        ApplyNavButtonState(KeybindsNavButton, page == NavigationPage.Keybinds);
+        ApplyNavButtonState(BluetoothNavButton, page == NavigationPage.Bluetooth);
+    }
+
+    private void ApplyNavButtonState(Button button, bool isActive)
+    {
+        button.Background = (Brush)FindResource(isActive ? "AccentStrongBrush" : "SurfaceAltBrush");
+        button.BorderBrush = (Brush)FindResource(isActive ? "AccentBrush" : "BorderBrush");
+        button.Foreground = (Brush)FindResource(isActive ? "TextPrimaryBrush" : "TextMutedBrush");
     }
 
     private void ToggleRecoilButton_Click(object sender, RoutedEventArgs e)
@@ -250,7 +335,7 @@ public partial class MainWindow : Window
     private void ApplyRecoilState(bool enabled)
     {
         _recoilTimer.IsEnabled = enabled;
-        RecoilStatusText.Text = enabled ? "Active" : "Not active";
+        RecoilStatusText.Text = enabled ? "Enabled" : "Disabled";
         RecoilStatusText.Foreground = (Brush)FindResource(enabled ? "SuccessBrush" : "DangerBrush");
         ToggleRecoilButton.Content = enabled ? "Disable recoil" : "Enable recoil";
     }
@@ -261,11 +346,8 @@ public partial class MainWindow : Window
         RecoilEnabled = _recoilTimer.IsEnabled,
         RequireRightMouseButton = RequireRightMouseCheckBox.IsChecked == true,
         BluetoothPort = BluetoothPortTextBox.Text.Trim(),
-        EnableHotkey = GetRequiredHotkey(HotkeyAction.EnableRecoil, ProfileSettings.DefaultEnableHotkeyKey),
-        DisableHotkey = GetRequiredHotkey(HotkeyAction.DisableRecoil, ProfileSettings.DefaultDisableHotkeyKey),
-        PresetHotkeys = _hotkeys
-            .Where(item => item.Action is not HotkeyAction.EnableRecoil and not HotkeyAction.DisableRecoil)
-            .Take(ProfileSettings.MaxPresetHotkeys)
+        Hotkeys = _hotkeys
+            .Take(ProfileSettings.MaxHotkeys)
             .Select(item => new PresetHotkeyBinding
             {
                 Hotkey = item.Hotkey,
@@ -285,18 +367,8 @@ public partial class MainWindow : Window
             BluetoothPortTextBox.Text = settings.BluetoothPort;
 
             _hotkeys.Clear();
-            _hotkeys.Add(new RuntimeHotkeyBinding
-            {
-                Hotkey = NormalizeHotkey(settings.EnableHotkey, ProfileSettings.DefaultEnableHotkeyKey),
-                Action = HotkeyAction.EnableRecoil,
-            });
-            _hotkeys.Add(new RuntimeHotkeyBinding
-            {
-                Hotkey = NormalizeHotkey(settings.DisableHotkey, ProfileSettings.DefaultDisableHotkeyKey),
-                Action = HotkeyAction.DisableRecoil,
-            });
 
-            foreach (var item in settings.PresetHotkeys.Take(ProfileSettings.MaxPresetHotkeys))
+            foreach (var item in settings.Hotkeys.Take(ProfileSettings.MaxHotkeys))
             {
                 var decoded = DecodeHotkeyTarget(item.PresetPath);
                 if (decoded.Action == HotkeyAction.PresetSelection && string.IsNullOrWhiteSpace(decoded.PresetPath))
@@ -319,6 +391,7 @@ public partial class MainWindow : Window
             }
 
             RemoveDuplicateHotkeys();
+            EnsureDefaultHotkeys();
             RefreshHotkeyList();
         }
         finally
@@ -347,7 +420,7 @@ public partial class MainWindow : Window
 
     private void SaveProfile()
     {
-        if (_applyingProfile)
+        if (_applyingProfile || _isInitializing)
         {
             return;
         }
@@ -483,7 +556,6 @@ public partial class MainWindow : Window
 
     private void RefreshHotkeyList()
     {
-        EnsureDefaultHotkeys();
         HotkeysListBox.ItemsSource = _hotkeys
             .OrderBy(hotkey => hotkey.Hotkey.Modifiers)
             .ThenBy(hotkey => hotkey.Hotkey.Key)
@@ -492,23 +564,66 @@ public partial class MainWindow : Window
 
     private void AddHotkeyButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_hotkeys.Count(item => item.Action is not HotkeyAction.EnableRecoil and not HotkeyAction.DisableRecoil)
-            >= ProfileSettings.MaxPresetHotkeys)
+        if (_hotkeys.Count >= ProfileSettings.MaxHotkeys)
         {
-            MessageBox.Show(this, $"You can configure up to {ProfileSettings.MaxPresetHotkeys} custom hotkeys.", "NoRecoil", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(this, $"You can configure up to {ProfileSettings.MaxHotkeys} hotkeys.", "NoRecoil", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
-        var actionDialog = new HotkeyActionDialog { Owner = this };
-        if (actionDialog.ShowDialog() != true)
+        HotkeyActionComboBox.SelectedIndex = 0;
+        HotkeyPresetPathTextBox.Text = string.Empty;
+        ToggleHotkeyPresetRowVisibility();
+        SetHotkeyActionEditorVisibility(true);
+    }
+
+    private void HotkeyActionComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        ToggleHotkeyPresetRowVisibility();
+    }
+
+    private void BrowseHotkeyPresetButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
         {
+            Filter = "INI files (*.ini)|*.ini|All files (*.*)|*.*",
+            DefaultExt = "ini",
+            CheckFileExists = true,
+        };
+
+        SetInitialDirectory(dialog);
+        if (dialog.ShowDialog(this) == true)
+        {
+            HotkeyPresetPathTextBox.Text = dialog.FileName;
+        }
+    }
+
+    private void ContinueHotkeyActionButton_Click(object sender, RoutedEventArgs e)
+    {
+        var selectedAction = SelectedHotkeyAction;
+        var selectedPresetPath = SelectedHotkeyPresetPath;
+        if (selectedAction == HotkeyAction.PresetSelection
+            && (string.IsNullOrWhiteSpace(selectedPresetPath) || !File.Exists(selectedPresetPath)))
+        {
+            MessageBox.Show(this, "Select a valid preset INI file for preset selection.", "NoRecoil", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
-        CaptureAndApplyHotkey($"Press the key combination for {GetActionDisplayName(actionDialog.SelectedAction)}", binding =>
+        if (CaptureAndApplyHotkey($"Press the key combination for {GetActionDisplayName(selectedAction)}", binding =>
+            {
+                UpsertHotkey(selectedAction, binding, selectedPresetPath);
+            }))
         {
-            UpsertHotkey(actionDialog.SelectedAction, binding, actionDialog.SelectedPresetPath);
-        });
+            HotkeyPresetPathTextBox.Text = string.Empty;
+            SetHotkeyActionEditorVisibility(false);
+        }
+    }
+
+    private void CancelHotkeyActionButton_Click(object sender, RoutedEventArgs e)
+    {
+        HotkeyActionComboBox.SelectedIndex = 0;
+        HotkeyPresetPathTextBox.Text = string.Empty;
+        ToggleHotkeyPresetRowVisibility();
+        SetHotkeyActionEditorVisibility(false);
     }
 
     private void EditHotkeyButton_Click(object sender, RoutedEventArgs e)
@@ -532,29 +647,25 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (selected.Action is HotkeyAction.EnableRecoil or HotkeyAction.DisableRecoil)
-        {
-            MessageBox.Show(this, "Enable/disable hotkeys are required and cannot be removed.", "NoRecoil", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
-
         _hotkeys.Remove(selected);
+        EnsureDefaultHotkeys();
         RefreshHotkeyList();
         SaveProfile();
     }
 
-    private void CaptureAndApplyHotkey(string prompt, Action<HotkeyBinding> apply)
+    private bool CaptureAndApplyHotkey(string prompt, Action<HotkeyBinding> apply)
     {
         var dialog = new HotkeyCaptureDialog("Capture hotkey", prompt) { Owner = this };
         if (dialog.ShowDialog() != true || dialog.CapturedHotkey is null)
         {
-            return;
+            return false;
         }
 
         apply(dialog.CapturedHotkey);
         ResetPressedStates();
         RefreshHotkeyList();
         SaveProfile();
+        return true;
     }
 
     private void EnsureDefaultHotkeys()
@@ -578,23 +689,8 @@ public partial class MainWindow : Window
         }
     }
 
-    private HotkeyBinding GetRequiredHotkey(HotkeyAction action, int fallbackKey)
-    {
-        var match = _hotkeys.FirstOrDefault(item => item.Action == action);
-        return NormalizeHotkey(match?.Hotkey, fallbackKey);
-    }
-
     private void UpsertHotkey(HotkeyAction action, HotkeyBinding hotkey, string? presetPath)
     {
-        var existingByAction = action is HotkeyAction.EnableRecoil or HotkeyAction.DisableRecoil
-            ? _hotkeys.FirstOrDefault(item => item.Action == action)
-            : null;
-        if (existingByAction is not null)
-        {
-            existingByAction.Hotkey = hotkey;
-            return;
-        }
-
         var existingByHotkey = _hotkeys.FirstOrDefault(item => item.Hotkey.Key == hotkey.Key && item.Hotkey.Modifiers == hotkey.Modifiers);
         var normalizedPresetPath = string.IsNullOrWhiteSpace(presetPath) ? string.Empty : presetPath.Trim();
         if (existingByHotkey is null)

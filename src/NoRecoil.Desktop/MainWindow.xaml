@@ -5,134 +5,253 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
         Title="NoRecoil Controller"
-        Width="900"
-        Height="680"
-        MinWidth="820"
-        MinHeight="620">
-    <Grid Margin="18">
-        <TabControl Name="MainTabControl">
-            <TabItem Header="Main">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                    <StackPanel Margin="0,12,0,0">
-                        <Border Style="{StaticResource CardBorderStyle}">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="90"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="90"/>
-                                </Grid.ColumnDefinitions>
+        Width="630"
+        Height="760"
+        MinWidth="570"
+        MinHeight="700"
+        Background="{StaticResource WindowBackgroundBrush}"
+        Foreground="{StaticResource TextPrimaryBrush}"
+        WindowStartupLocation="CenterScreen">
+    <Grid Margin="20">
 
-                                <TextBlock Grid.Row="0" Grid.ColumnSpan="3" Style="{StaticResource SectionTitleStyle}" Text="Recoil preset"/>
+        <Grid.LayoutTransform>
+            <ScaleTransform ScaleX="0.75" ScaleY="0.75"/>
+        </Grid.LayoutTransform>
 
-                                <TextBlock Grid.Row="0" Grid.Column="0" Margin="0,32,0,0" VerticalAlignment="Center" Text="Right"/>
-                                <Slider Name="RightSlider" Grid.Row="0" Grid.Column="1" Margin="8,30,8,0" Minimum="0" Maximum="100" ValueChanged="Slider_ValueChanged"/>
-                                <TextBlock Name="RightValueText" Grid.Row="0" Grid.Column="2" Margin="0,32,0,0" HorizontalAlignment="Right" VerticalAlignment="Center" Text="0"/>
+        <Border Background="{StaticResource SurfaceBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="2"
+                CornerRadius="18"
+                Padding="14">
+            <Grid TextElement.Foreground="{StaticResource TextPrimaryBrush}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
 
-                                <TextBlock Grid.Row="1" Grid.Column="0" Margin="0,14,0,0" VerticalAlignment="Center" Text="Down"/>
-                                <Slider Name="DownSlider" Grid.Row="1" Grid.Column="1" Margin="8,12,8,0" Minimum="0" Maximum="100" ValueChanged="Slider_ValueChanged"/>
-                                <TextBlock Name="DownValueText" Grid.Row="1" Grid.Column="2" Margin="0,14,0,0" HorizontalAlignment="Right" VerticalAlignment="Center" Text="0"/>
+                <Border Grid.Row="0"
+                        Background="{StaticResource SurfaceAltBrush}"
+                        BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="2"
+                        CornerRadius="12"
+                        Padding="8"
+                        Margin="0,0,0,14">
+                    <WrapPanel>
+                        <Button Name="MainNavButton" Content="Main" Padding="24,10" Margin="0,0,10,0" Click="MainNavButton_Click"/>
+                        <Button Name="KeybindsNavButton" Content="Keybinds" Padding="24,10" Margin="0,0,10,0" Click="KeybindsNavButton_Click"/>
+                        <Button Name="BluetoothNavButton" Content="Bluetooth" Padding="24,10" Margin="0" Click="BluetoothNavButton_Click"/>
+                    </WrapPanel>
+                </Border>
 
-                                <TextBlock Grid.Row="2" Grid.Column="0" Margin="0,14,0,0" VerticalAlignment="Center" Text="Left"/>
-                                <Slider Name="LeftSlider" Grid.Row="2" Grid.Column="1" Margin="8,12,8,0" Minimum="0" Maximum="100" ValueChanged="Slider_ValueChanged"/>
-                                <TextBlock Name="LeftValueText" Grid.Row="2" Grid.Column="2" Margin="0,14,0,0" HorizontalAlignment="Right" VerticalAlignment="Center" Text="0"/>
-
-                                <TextBlock Grid.Row="3" Grid.Column="0" Margin="0,14,0,0" VerticalAlignment="Center" Text="Up"/>
-                                <Slider Name="UpSlider" Grid.Row="3" Grid.Column="1" Margin="8,12,8,0" Minimum="0" Maximum="100" ValueChanged="Slider_ValueChanged"/>
-                                <TextBlock Name="UpValueText" Grid.Row="3" Grid.Column="2" Margin="0,14,0,0" HorizontalAlignment="Right" VerticalAlignment="Center" Text="0"/>
-
-                                <TextBlock Grid.Row="4" Grid.Column="0" Margin="0,14,0,0" VerticalAlignment="Center" Text="Delay"/>
-                                <Slider Name="DelaySlider" Grid.Row="4" Grid.Column="1" Margin="8,12,8,0" Minimum="0" Maximum="200" ValueChanged="Slider_ValueChanged"/>
-                                <TextBlock Name="DelayValueText" Grid.Row="4" Grid.Column="2" Margin="0,14,0,0" HorizontalAlignment="Right" VerticalAlignment="Center" Text="0 ms"/>
-                            </Grid>
-                        </Border>
-
-                        <Border Style="{StaticResource CardBorderStyle}">
+                <Border Grid.Row="1"
+                        Background="{StaticResource SurfaceBrush}"
+                        BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="2"
+                        CornerRadius="16"
+                        Padding="18">
+                    <Grid>
+                        <ScrollViewer Name="MainPagePanel" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Visibility="Visible">
                             <StackPanel>
-                                <TextBlock Style="{StaticResource SectionTitleStyle}" Text="Controls"/>
-                                <WrapPanel Margin="0,0,0,8">
-                                    <Button Name="SavePresetButton" Style="{StaticResource PrimaryButtonStyle}" Content="Save preset" Click="SaveButton_Click"/>
-                                    <Button Name="LoadPresetButton" Content="Load preset" Click="LoadButton_Click"/>
-                                    <Button Name="ToggleRecoilButton" Content="Enable recoil" Click="ToggleRecoilButton_Click"/>
-                                </WrapPanel>
-                                <CheckBox Name="RequireRightMouseCheckBox" Content="Require right mouse together with left" Checked="RequireRightMouseCheckbox_Changed" Unchecked="RequireRightMouseCheckbox_Changed"/>
+                                <Border Style="{StaticResource CardBorderStyle}" Padding="22">
+                                    <StackPanel TextElement.FontSize="16.8">
+                                        <TextBlock Style="{StaticResource SectionTitleStyle}" FontSize="24" Text="Recoil preset"/>
 
-                                <Grid Margin="0,12,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="120"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" Text="Recoil status"/>
-                                    <TextBlock Name="RecoilStatusText" Grid.Column="1" FontWeight="SemiBold" Text="Not active"/>
-                                </Grid>
+                                        <Grid Margin="0,0,0,10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="90"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="80"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="Right"/>
+                                            <Slider Name="RightSlider" Grid.Column="1" Minimum="0" Maximum="100" ValueChanged="Slider_ValueChanged"/>
+                                            <TextBlock Name="RightValueText" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center" Text="0" FontWeight="SemiBold"/>
+                                        </Grid>
 
-                                <Grid Margin="0,8,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="120"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" Text="Last preset"/>
-                                    <TextBlock Name="LastPathText" Grid.Column="1" VerticalAlignment="Center" Text="-" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
-                                </Grid>
+                                        <Grid Margin="0,0,0,10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="90"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="80"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="Down"/>
+                                            <Slider Name="DownSlider" Grid.Column="1" Minimum="0" Maximum="100" ValueChanged="Slider_ValueChanged"/>
+                                            <TextBlock Name="DownValueText" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center" Text="0" FontWeight="SemiBold"/>
+                                        </Grid>
+
+                                        <Grid Margin="0,0,0,10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="90"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="80"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="Left"/>
+                                            <Slider Name="LeftSlider" Grid.Column="1" Minimum="0" Maximum="100" ValueChanged="Slider_ValueChanged"/>
+                                            <TextBlock Name="LeftValueText" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center" Text="0" FontWeight="SemiBold"/>
+                                        </Grid>
+
+                                        <Grid Margin="0,0,0,10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="90"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="80"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="Up"/>
+                                            <Slider Name="UpSlider" Grid.Column="1" Minimum="0" Maximum="100" ValueChanged="Slider_ValueChanged"/>
+                                            <TextBlock Name="UpValueText" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center" Text="0" FontWeight="SemiBold"/>
+                                        </Grid>
+
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="90"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="80"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="Delay"/>
+                                            <Slider Name="DelaySlider" Grid.Column="1" Minimum="0" Maximum="200" ValueChanged="Slider_ValueChanged"/>
+                                            <TextBlock Name="DelayValueText" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center" Text="0 ms" FontWeight="SemiBold"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Style="{StaticResource CardBorderStyle}" Padding="22">
+                                    <StackPanel TextElement.FontSize="16.8">
+                                        <TextBlock Style="{StaticResource SectionTitleStyle}" FontSize="24" Text="Controls"/>
+                                        <WrapPanel Margin="0,0,0,6">
+                                            <Button Name="SavePresetButton" Style="{StaticResource PrimaryButtonStyle}" Content="Save preset" Click="SaveButton_Click"/>
+                                            <Button Name="LoadPresetButton" Content="Load preset" Click="LoadButton_Click"/>
+                                            <Button Name="ToggleRecoilButton" Content="Enable recoil" Click="ToggleRecoilButton_Click"/>
+                                        </WrapPanel>
+                                        <CheckBox Name="RequireRightMouseCheckBox" Content="Require right mouse together with left" Checked="RequireRightMouseCheckbox_Changed" Unchecked="RequireRightMouseCheckbox_Changed"/>
+
+                                        <Grid Margin="0,16,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="140"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" Text="Recoil status"/>
+                                            <TextBlock Name="RecoilStatusText" Grid.Column="1" FontWeight="SemiBold" Text="Disabled"/>
+                                        </Grid>
+
+                                        <Grid Margin="0,10,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="140"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" Text="Last preset"/>
+                                            <TextBlock Name="LastPathText" Grid.Column="1" VerticalAlignment="Center" Text="-" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
                             </StackPanel>
-                        </Border>
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
+                        </ScrollViewer>
 
-            <TabItem Header="Keybinds">
-                <StackPanel Margin="0,12,0,0">
-                    <Border Style="{StaticResource CardBorderStyle}">
-                        <StackPanel>
-                            <TextBlock Style="{StaticResource SectionTitleStyle}" Text="Hotkeys"/>
-                            <TextBlock Margin="0,0,0,12" Foreground="{StaticResource TextMutedBrush}" Text="F1/F2 are configured by default. Add or edit hotkeys to change recoil controls and preset actions." TextWrapping="Wrap"/>
-                            <ListBox Name="HotkeysListBox" Height="320" DisplayMemberPath="DisplayText"/>
-                            <WrapPanel Margin="0,12,0,0">
-                                <Button Name="AddHotkeyButton" Style="{StaticResource PrimaryButtonStyle}" Content="Add hotkey" Click="AddHotkeyButton_Click"/>
-                                <Button Name="EditHotkeyButton" Content="Edit selected" Click="EditHotkeyButton_Click"/>
-                                <Button Name="RemoveHotkeyButton" Content="Remove selected" Click="RemoveHotkeyButton_Click"/>
-                            </WrapPanel>
+                        <StackPanel Name="KeybindsPagePanel" Visibility="Collapsed">
+                            <Border Style="{StaticResource CardBorderStyle}">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource SectionTitleStyle}" Text="Hotkeys"/>
+                                    <TextBlock Margin="0,0,0,12" Foreground="{StaticResource TextMutedBrush}" Text="F1/F2 are configured by default. Add or edit hotkeys to change recoil controls and preset actions." TextWrapping="Wrap"/>
+                                    <ListBox Name="HotkeysListBox" Height="340" DisplayMemberPath="DisplayText"/>
+                                    <WrapPanel Margin="0,14,0,0">
+                                        <Button Name="AddHotkeyButton" Style="{StaticResource PrimaryButtonStyle}" Content="Add hotkey" Click="AddHotkeyButton_Click"/>
+                                        <Button Name="EditHotkeyButton" Content="Edit selected" Click="EditHotkeyButton_Click"/>
+                                        <Button Name="RemoveHotkeyButton" Content="Remove selected" Click="RemoveHotkeyButton_Click"/>
+                                    </WrapPanel>
+
+                                    <Border Name="HotkeyActionPanel"
+                                            Margin="0,12,0,0"
+                                            Padding="14"
+                                            Background="{StaticResource SurfaceAltBrush}"
+                                            BorderBrush="{StaticResource BorderBrush}"
+                                            BorderThickness="2"
+                                            CornerRadius="12"
+                                            Visibility="Collapsed">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+
+                                            <TextBlock Grid.Row="0"
+                                                       Foreground="{StaticResource TextMutedBrush}"
+                                                       Text="Select an action, then continue to capture its hotkey."
+                                                       TextWrapping="Wrap"/>
+
+                                            <Grid Grid.Row="1" Margin="0,10,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="90"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="Action"/>
+                                                <ComboBox Name="HotkeyActionComboBox"
+                                                          Grid.Column="1"
+                                                          DisplayMemberPath="Label"
+                                                          SelectionChanged="HotkeyActionComboBox_SelectionChanged"/>
+                                            </Grid>
+
+                                            <StackPanel Name="HotkeyPresetRow" Grid.Row="2" Margin="0,10,0,0">
+                                                <TextBlock Name="HotkeyPresetPathLabel" Text="Preset file"/>
+                                                <Grid Margin="0,6,0,0">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBox Name="HotkeyPresetPathTextBox" VerticalContentAlignment="Center"/>
+                                                    <Button Name="BrowseHotkeyPresetButton"
+                                                            Grid.Column="1"
+                                                            Margin="10,0,0,0"
+                                                            Content="Browse"
+                                                            Click="BrowseHotkeyPresetButton_Click"/>
+                                                </Grid>
+                                            </StackPanel>
+
+                                            <WrapPanel Grid.Row="3" Margin="0,14,0,0">
+                                                <Button Name="ContinueHotkeyActionButton"
+                                                        Style="{StaticResource PrimaryButtonStyle}"
+                                                        Content="Continue to capture"
+                                                        Click="ContinueHotkeyActionButton_Click"/>
+                                                <Button Name="CancelHotkeyActionButton"
+                                                        Content="Cancel"
+                                                        Click="CancelHotkeyActionButton_Click"/>
+                                            </WrapPanel>
+                                        </Grid>
+                                    </Border>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
-                    </Border>
-                </StackPanel>
-            </TabItem>
 
-            <TabItem Header="Bluetooth">
-                <StackPanel Margin="0,12,0,0">
-                    <Border Style="{StaticResource CardBorderStyle}">
-                        <StackPanel>
-                            <TextBlock Style="{StaticResource SectionTitleStyle}" Text="Bluetooth sync"/>
-                            <TextBlock Margin="0,0,0,14" Foreground="{StaticResource TextMutedBrush}" Text="Connect to a Bluetooth serial COM port to send current preset values and receive updates." TextWrapping="Wrap"/>
+                        <StackPanel Name="BluetoothPagePanel" Visibility="Collapsed">
+                            <Border Style="{StaticResource CardBorderStyle}">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource SectionTitleStyle}" Text="Bluetooth sync"/>
+                                    <TextBlock Margin="0,0,0,14" Foreground="{StaticResource TextMutedBrush}" Text="Connect to a Bluetooth serial COM port to send current preset values and receive updates." TextWrapping="Wrap"/>
 
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="110"/>
-                                    <ColumnDefinition Width="220"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="COM port"/>
-                                <TextBox Name="BluetoothPortTextBox" Grid.Column="1" Margin="0,0,10,0" VerticalContentAlignment="Center" TextChanged="BluetoothPortTextBox_TextChanged"/>
-                                <Button Name="ConnectBluetoothButton" Grid.Column="2" Margin="0" Padding="18,8" Content="Connect" Click="ConnectBluetoothButton_Click"/>
-                            </Grid>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="130"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="COM port"/>
+                                        <TextBox Name="BluetoothPortTextBox" Grid.Column="1" Margin="0,0,10,0" VerticalContentAlignment="Center" TextChanged="BluetoothPortTextBox_TextChanged"/>
+                                        <Button Name="ConnectBluetoothButton" Grid.Column="2" Margin="0,0,0,0" Content="Connect" Click="ConnectBluetoothButton_Click"/>
+                                    </Grid>
 
-                            <Grid Margin="0,14,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="110"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" Text="Connection"/>
-                                <TextBlock Name="BluetoothStatusText" Grid.Column="1" FontWeight="SemiBold" Text="Disconnected"/>
-                            </Grid>
+                                    <Grid Margin="0,16,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="130"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" Text="Connection"/>
+                                        <TextBlock Name="BluetoothStatusText" Grid.Column="1" FontWeight="SemiBold" Text="Disconnected"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
-                    </Border>
-                </StackPanel>
-            </TabItem>
-        </TabControl>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Border>
     </Grid>
 </Window>

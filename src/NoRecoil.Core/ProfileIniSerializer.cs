@@ -6,6 +6,8 @@ namespace NoRecoil.Core;
 public static class ProfileIniSerializer
 {
     private static readonly StringComparer KeyComparer = StringComparer.OrdinalIgnoreCase;
+    private const string EnableRecoilActionTarget = "__action__:EnableRecoil";
+    private const string DisableRecoilActionTarget = "__action__:DisableRecoil";
 
     public static ProfileSettings Parse(string content)
     {
@@ -21,10 +23,10 @@ public static class ProfileIniSerializer
             ["RecoilEnabled"] = "false",
             ["RequireRightMouseButton"] = "true",
             ["BluetoothPort"] = string.Empty,
-            ["EnableHotkey"] = ProfileSettings.DefaultEnableHotkeyKey.ToString(CultureInfo.InvariantCulture),
-            ["DisableHotkey"] = ProfileSettings.DefaultDisableHotkeyKey.ToString(CultureInfo.InvariantCulture),
+            ["EnableHotkey"] = string.Empty,
+            ["DisableHotkey"] = string.Empty,
         };
-        var presetHotkeyEntries = new List<string>();
+        var hotkeyEntries = new List<string>();
 
         foreach (var rawLine in content.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
@@ -40,12 +42,13 @@ public static class ProfileIniSerializer
             }
 
             var key = rawLine[..separator].Trim();
-            if (key.StartsWith("PresetHotkey", StringComparison.OrdinalIgnoreCase))
+            if (key.StartsWith("Hotkey", StringComparison.OrdinalIgnoreCase)
+                || key.StartsWith("PresetHotkey", StringComparison.OrdinalIgnoreCase))
             {
                 var presetValueText = separator == rawLine.Length - 1 ? string.Empty : rawLine[(separator + 1)..].Trim();
                 if (!string.IsNullOrWhiteSpace(presetValueText))
                 {
-                    presetHotkeyEntries.Add(presetValueText);
+                    hotkeyEntries.Add(presetValueText);
                 }
 
                 continue;
@@ -60,6 +63,10 @@ public static class ProfileIniSerializer
             values[key] = valueText;
         }
 
+        var parsedHotkeys = ParseHotkeys(hotkeyEntries);
+        AppendLegacyActionHotkey(parsedHotkeys, values["EnableHotkey"], EnableRecoilActionTarget, ProfileSettings.DefaultEnableHotkeyKey);
+        AppendLegacyActionHotkey(parsedHotkeys, values["DisableHotkey"], DisableRecoilActionTarget, ProfileSettings.DefaultDisableHotkeyKey);
+
         return new ProfileSettings
         {
             Preset = new RecoilPreset
@@ -73,17 +80,7 @@ public static class ProfileIniSerializer
             RecoilEnabled = ParseBoolOrDefault(values["RecoilEnabled"], defaultValue: false),
             RequireRightMouseButton = ParseBoolOrDefault(values["RequireRightMouseButton"], defaultValue: true),
             BluetoothPort = values["BluetoothPort"],
-            EnableHotkey = HotkeyBindingSerializer.ParseOrDefault(values["EnableHotkey"], new HotkeyBinding
-            {
-                Key = ProfileSettings.DefaultEnableHotkeyKey,
-                Modifiers = HotkeyModifiers.None,
-            }),
-            DisableHotkey = HotkeyBindingSerializer.ParseOrDefault(values["DisableHotkey"], new HotkeyBinding
-            {
-                Key = ProfileSettings.DefaultDisableHotkeyKey,
-                Modifiers = HotkeyModifiers.None,
-            }),
-            PresetHotkeys = ParsePresetHotkeys(presetHotkeyEntries),
+            Hotkeys = parsedHotkeys,
         };
     }
 
@@ -106,15 +103,18 @@ public static class ProfileIniSerializer
         output.AppendLine($"RecoilEnabled={settings.RecoilEnabled}");
         output.AppendLine($"RequireRightMouseButton={settings.RequireRightMouseButton}");
         output.AppendLine($"BluetoothPort={settings.BluetoothPort}");
-        output.AppendLine($"EnableHotkey={HotkeyBindingSerializer.Serialize(settings.EnableHotkey)}");
-        output.AppendLine($"DisableHotkey={HotkeyBindingSerializer.Serialize(settings.DisableHotkey)}");
 
-        var maxPresetHotkeys = Math.Min(settings.PresetHotkeys.Count, ProfileSettings.MaxPresetHotkeys);
-        for (var i = 0; i < maxPresetHotkeys; i++)
+        var maxHotkeys = Math.Min(settings.Hotkeys.Count, ProfileSettings.MaxHotkeys);
+        for (var i = 0; i < maxHotkeys; i++)
         {
-            var entry = settings.PresetHotkeys[i];
+            var entry = settings.Hotkeys[i];
+            if (string.IsNullOrWhiteSpace(entry.PresetPath))
+            {
+                continue;
+            }
+
             var hotkey = HotkeyBindingSerializer.Serialize(entry.Hotkey);
-            output.AppendLine($"PresetHotkey{i + 1}={hotkey}|{entry.PresetPath}");
+            output.AppendLine($"Hotkey{i + 1}={hotkey}|{entry.PresetPath}");
         }
 
         return output.ToString();
@@ -171,12 +171,12 @@ public static class ProfileIniSerializer
         };
     }
 
-    private static IReadOnlyList<PresetHotkeyBinding> ParsePresetHotkeys(IEnumerable<string> entries)
+    private static List<PresetHotkeyBinding> ParseHotkeys(IEnumerable<string> entries)
     {
         var parsed = new List<PresetHotkeyBinding>();
         foreach (var entry in entries)
         {
-            if (parsed.Count >= ProfileSettings.MaxPresetHotkeys)
+            if (parsed.Count >= ProfileSettings.MaxHotkeys)
             {
                 break;
             }
@@ -203,5 +203,31 @@ public static class ProfileIniSerializer
         }
 
         return parsed;
+    }
+
+    private static void AppendLegacyActionHotkey(List<PresetHotkeyBinding> target, string text, string actionTarget, int fallbackKey)
+    {
+        if (string.IsNullOrWhiteSpace(text) || target.Count >= ProfileSettings.MaxHotkeys)
+        {
+            return;
+        }
+
+        var parsedHotkey = HotkeyBindingSerializer.ParseOrDefault(text, new HotkeyBinding
+        {
+            Key = fallbackKey,
+            Modifiers = HotkeyModifiers.None,
+        });
+
+        if (target.Any(existing => existing.Hotkey.Key == parsedHotkey.Key
+                                   && existing.Hotkey.Modifiers == parsedHotkey.Modifiers))
+        {
+            return;
+        }
+
+        target.Add(new PresetHotkeyBinding
+        {
+            Hotkey = parsedHotkey,
+            PresetPath = actionTarget,
+        });
     }
 }

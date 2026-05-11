@@ -17,10 +17,11 @@ public class ProfileIniSerializerTests
             RecoilEnabled=true
             RequireRightMouseButton=false
             BluetoothPort=COM5
-            EnableHotkey=Ctrl+116
-            DisableHotkey=Shift+117
-            PresetHotkey1=Shift+56|C:\presets\ak.ini
-            PresetHotkey2=18+57|C:\presets\m4.ini
+            Hotkey1=Ctrl+116|__action__:EnableRecoil
+            Hotkey2=Shift+117|__action__:DisableRecoil
+            Hotkey3=Shift+56|C:\presets\ak.ini
+            Hotkey4=18+57|C:\presets\m4.ini
+            Hotkey5=Ctrl+118|__action__:EnableRecoil
             """;
 
         var settings = ProfileIniSerializer.Parse(input);
@@ -33,16 +34,22 @@ public class ProfileIniSerializerTests
         Assert.True(settings.RecoilEnabled);
         Assert.False(settings.RequireRightMouseButton);
         Assert.Equal("COM5", settings.BluetoothPort);
-        Assert.Equal(116, settings.EnableHotkey.Key);
-        Assert.Equal(HotkeyModifiers.Control, settings.EnableHotkey.Modifiers);
-        Assert.Equal(117, settings.DisableHotkey.Key);
-        Assert.Equal(HotkeyModifiers.Shift, settings.DisableHotkey.Modifiers);
-        Assert.Equal(2, settings.PresetHotkeys.Count);
-        Assert.Equal(56, settings.PresetHotkeys[0].Hotkey.Key);
-        Assert.Equal(HotkeyModifiers.Shift, settings.PresetHotkeys[0].Hotkey.Modifiers);
-        Assert.Equal(@"C:\presets\ak.ini", settings.PresetHotkeys[0].PresetPath);
-        Assert.Equal(57, settings.PresetHotkeys[1].Hotkey.Key);
-        Assert.Equal(HotkeyModifiers.None, settings.PresetHotkeys[1].Hotkey.Modifiers);
+        Assert.Equal(5, settings.Hotkeys.Count);
+        Assert.Equal(116, settings.Hotkeys[0].Hotkey.Key);
+        Assert.Equal(HotkeyModifiers.Control, settings.Hotkeys[0].Hotkey.Modifiers);
+        Assert.Equal("__action__:EnableRecoil", settings.Hotkeys[0].PresetPath);
+        Assert.Equal(117, settings.Hotkeys[1].Hotkey.Key);
+        Assert.Equal(HotkeyModifiers.Shift, settings.Hotkeys[1].Hotkey.Modifiers);
+        Assert.Equal("__action__:DisableRecoil", settings.Hotkeys[1].PresetPath);
+        Assert.Equal(56, settings.Hotkeys[2].Hotkey.Key);
+        Assert.Equal(HotkeyModifiers.Shift, settings.Hotkeys[2].Hotkey.Modifiers);
+        Assert.Equal(@"C:\presets\ak.ini", settings.Hotkeys[2].PresetPath);
+        Assert.Equal(57, settings.Hotkeys[3].Hotkey.Key);
+        Assert.Equal(HotkeyModifiers.None, settings.Hotkeys[3].Hotkey.Modifiers);
+        Assert.Equal(@"C:\presets\m4.ini", settings.Hotkeys[3].PresetPath);
+        Assert.Equal(118, settings.Hotkeys[4].Hotkey.Key);
+        Assert.Equal(HotkeyModifiers.Control, settings.Hotkeys[4].Hotkey.Modifiers);
+        Assert.Equal("__action__:EnableRecoil", settings.Hotkeys[4].PresetPath);
     }
 
     [Fact]
@@ -60,8 +67,7 @@ public class ProfileIniSerializerTests
         Assert.False(settings.RecoilEnabled);
         Assert.True(settings.RequireRightMouseButton);
         Assert.Equal(string.Empty, settings.BluetoothPort);
-        Assert.Equal(ProfileSettings.DefaultEnableHotkeyKey, settings.EnableHotkey.Key);
-        Assert.Equal(ProfileSettings.DefaultDisableHotkeyKey, settings.DisableHotkey.Key);
+        Assert.Empty(settings.Hotkeys);
     }
 
     [Fact]
@@ -80,18 +86,26 @@ public class ProfileIniSerializerTests
             RecoilEnabled = true,
             RequireRightMouseButton = true,
             BluetoothPort = "COM7",
-            EnableHotkey = new HotkeyBinding
-            {
-                Key = 114,
-                Modifiers = HotkeyModifiers.Control,
-            },
-            DisableHotkey = new HotkeyBinding
-            {
-                Key = 115,
-                Modifiers = HotkeyModifiers.Shift | HotkeyModifiers.Alt,
-            },
-            PresetHotkeys =
+            Hotkeys =
             [
+                new PresetHotkeyBinding
+                {
+                    Hotkey = new HotkeyBinding
+                    {
+                        Key = 114,
+                        Modifiers = HotkeyModifiers.Control,
+                    },
+                    PresetPath = "__action__:EnableRecoil",
+                },
+                new PresetHotkeyBinding
+                {
+                    Hotkey = new HotkeyBinding
+                    {
+                        Key = 115,
+                        Modifiers = HotkeyModifiers.Shift | HotkeyModifiers.Alt,
+                    },
+                    PresetPath = "__action__:DisableRecoil",
+                },
                 new PresetHotkeyBinding
                 {
                     Hotkey = new HotkeyBinding
@@ -115,38 +129,40 @@ public class ProfileIniSerializerTests
         Assert.Contains("RecoilEnabled=True", ini);
         Assert.Contains("RequireRightMouseButton=True", ini);
         Assert.Contains("BluetoothPort=COM7", ini);
-        Assert.Contains("EnableHotkey=Ctrl+114", ini);
-        Assert.Contains("DisableHotkey=Alt+Shift+115", ini);
-        Assert.Contains(@"PresetHotkey1=Shift+56|C:\presets\ak.ini", ini);
+        Assert.Contains("Hotkey1=Ctrl+114|__action__:EnableRecoil", ini);
+        Assert.Contains("Hotkey2=Alt+Shift+115|__action__:DisableRecoil", ini);
+        Assert.Contains(@"Hotkey3=Shift+56|C:\presets\ak.ini", ini);
+        Assert.DoesNotContain("EnableHotkey=", ini);
+        Assert.DoesNotContain("DisableHotkey=", ini);
     }
 
     [Fact]
-    public void Parse_LimitsPresetHotkeysToMax()
+    public void Parse_LimitsHotkeysToMax()
     {
-        const int excessivePresetHotkeyCount = ProfileSettings.MaxPresetHotkeys + 5;
+        const int excessiveHotkeyCount = ProfileSettings.MaxHotkeys + 5;
         var lines = new List<string>
         {
             "[Profile]",
             "Right=1",
         };
 
-        for (var i = 1; i <= excessivePresetHotkeyCount; i++)
+        for (var i = 1; i <= excessiveHotkeyCount; i++)
         {
-            lines.Add($"PresetHotkey{i}=Ctrl+{80 + i}|C:\\presets\\preset{i}.ini");
+            lines.Add($"Hotkey{i}=Ctrl+{80 + i}|__action__:EnableRecoil");
         }
 
         var settings = ProfileIniSerializer.Parse(string.Join(Environment.NewLine, lines));
 
-        Assert.Equal(ProfileSettings.MaxPresetHotkeys, settings.PresetHotkeys.Count);
-        Assert.Equal(@"C:\presets\preset1.ini", settings.PresetHotkeys[0].PresetPath);
-        Assert.Equal(@"C:\presets\preset20.ini", settings.PresetHotkeys[^1].PresetPath);
+        Assert.Equal(ProfileSettings.MaxHotkeys, settings.Hotkeys.Count);
+        Assert.Equal("__action__:EnableRecoil", settings.Hotkeys[0].PresetPath);
+        Assert.Equal("__action__:EnableRecoil", settings.Hotkeys[^1].PresetPath);
     }
 
     [Fact]
-    public void Serialize_LimitsPresetHotkeysToMax()
+    public void Serialize_LimitsHotkeysToMax()
     {
-        const int excessivePresetHotkeyCount = ProfileSettings.MaxPresetHotkeys + 5;
-        var presetHotkeys = Enumerable.Range(1, excessivePresetHotkeyCount)
+        const int excessiveHotkeyCount = ProfileSettings.MaxHotkeys + 5;
+        var hotkeys = Enumerable.Range(1, excessiveHotkeyCount)
             .Select(i => new PresetHotkeyBinding
             {
                 Hotkey = new HotkeyBinding
@@ -154,25 +170,47 @@ public class ProfileIniSerializerTests
                     Key = 40 + i,
                     Modifiers = HotkeyModifiers.Control,
                 },
-                PresetPath = $@"C:\presets\preset{i}.ini",
+                PresetPath = "__action__:ToggleRecoil",
             })
             .ToArray();
 
         var settings = new ProfileSettings
         {
             Preset = new RecoilPreset(),
-            PresetHotkeys = presetHotkeys,
+            Hotkeys = hotkeys,
         };
 
         var ini = ProfileIniSerializer.Serialize(settings, includeSectionHeader: true);
 
-        var presetLines = ini
+        var hotkeyLines = ini
             .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
-            .Where(line => line.StartsWith("PresetHotkey", StringComparison.OrdinalIgnoreCase))
+            .Where(line => line.StartsWith("Hotkey", StringComparison.OrdinalIgnoreCase))
             .ToArray();
 
-        Assert.Equal(ProfileSettings.MaxPresetHotkeys, presetLines.Length);
-        Assert.Contains(@"PresetHotkey20=Ctrl+60|C:\presets\preset20.ini", presetLines);
-        Assert.DoesNotContain(presetLines, line => line.StartsWith("PresetHotkey21=", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(ProfileSettings.MaxHotkeys, hotkeyLines.Length);
+        Assert.Contains("Hotkey20=Ctrl+60|__action__:ToggleRecoil", hotkeyLines);
+        Assert.DoesNotContain(hotkeyLines, line => line.StartsWith("Hotkey65=", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Parse_SupportsLegacyEnableDisableAndPresetHotkeyKeys()
+    {
+        const string input = """
+            [Profile]
+            EnableHotkey=Ctrl+116
+            DisableHotkey=Shift+117
+            PresetHotkey1=Alt+56|C:\presets\legacy.ini
+            """;
+
+        var settings = ProfileIniSerializer.Parse(input);
+
+        Assert.Equal(3, settings.Hotkeys.Count);
+        Assert.Contains(settings.Hotkeys, item => item.PresetPath == @"C:\presets\legacy.ini");
+        Assert.Contains(settings.Hotkeys, item => item.PresetPath == "__action__:EnableRecoil"
+                                                && item.Hotkey.Key == 116
+                                                && item.Hotkey.Modifiers == HotkeyModifiers.Control);
+        Assert.Contains(settings.Hotkeys, item => item.PresetPath == "__action__:DisableRecoil"
+                                                && item.Hotkey.Key == 117
+                                                && item.Hotkey.Modifiers == HotkeyModifiers.Shift);
     }
 }
