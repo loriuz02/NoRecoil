@@ -145,7 +145,7 @@ public static class ProfileIniSerializer
             return 0;
         }
 
-        return value == int.MinValue ? int.MaxValue : Math.Abs(value);
+        return NumericValueNormalizer.ToAbsolute(value);
     }
 
     private static bool ParseBoolOrDefault(string valueText, bool defaultValue)
