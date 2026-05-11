@@ -1,3 +1,4 @@
+using System.IO;
 using System.Windows;
 using Microsoft.Win32;
 
@@ -11,8 +12,8 @@ public partial class HotkeyActionDialog : Window
         .Select(action => new ActionOption(action, GetActionDisplayName(action)))
         .ToList();
 
-    public MainWindow.HotkeyAction SelectedAction => (ActionComboBox.SelectedItem as ActionOption)?.Action ?? MainWindow.HotkeyAction.PresetSelection;
-    public string SelectedPresetPath => PresetPathTextBox.Text.Trim();
+    internal MainWindow.HotkeyAction SelectedAction => (ActionComboBox.SelectedItem as ActionOption)?.Action ?? MainWindow.HotkeyAction.PresetSelection;
+    internal string SelectedPresetPath => PresetPathTextBox.Text.Trim();
 
     public HotkeyActionDialog()
     {

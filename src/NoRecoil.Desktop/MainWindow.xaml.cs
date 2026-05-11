@@ -1,3 +1,4 @@
+using System.IO;
 using System.IO.Ports;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -45,8 +46,9 @@ public partial class MainWindow : Window
         var lastPath = _lastPathCache.Load();
         if (!string.IsNullOrWhiteSpace(lastPath) && File.Exists(lastPath))
         {
-            ApplyPreset(PresetIniSerializer.LoadFromFile(lastPath));
-            LastPathText.Text = lastPath;
+            var resolvedPath = lastPath.Trim();
+            ApplyPreset(PresetIniSerializer.LoadFromFile(resolvedPath));
+            LastPathText.Text = resolvedPath;
         }
 
         UpdateDelayLabel();
