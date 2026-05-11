@@ -64,10 +64,10 @@ public static class ProfileIniSerializer
         {
             Preset = new RecoilPreset
             {
-                Right = ParseAbsoluteIntOrDefault(values["Right"]),
-                Down = ParseAbsoluteIntOrDefault(values["Down"]),
-                Left = ParseAbsoluteIntOrDefault(values["Left"]),
-                Up = ParseAbsoluteIntOrDefault(values["Up"]),
+                Right = ParseAndNormalizeIntOrDefault(values["Right"]),
+                Down = ParseAndNormalizeIntOrDefault(values["Down"]),
+                Left = ParseAndNormalizeIntOrDefault(values["Left"]),
+                Up = ParseAndNormalizeIntOrDefault(values["Up"]),
                 Delay = ParseIntOrDefault(values["Delay"]),
             },
             RecoilEnabled = ParseBoolOrDefault(values["RecoilEnabled"], defaultValue: false),
@@ -138,7 +138,7 @@ public static class ProfileIniSerializer
         return int.TryParse(valueText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) ? value : 0;
     }
 
-    private static int ParseAbsoluteIntOrDefault(string valueText)
+    private static int ParseAndNormalizeIntOrDefault(string valueText)
     {
         if (!int.TryParse(valueText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value))
         {

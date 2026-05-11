@@ -184,7 +184,8 @@ public sealed class KeybindsForm : Form
                 DisableHotkey = binding;
                 break;
             case PendingCapture.AddPreset:
-                var existingBinding = _presetHotkeys.FirstOrDefault(item => item.Hotkey.Key == binding.Key && item.Hotkey.Modifiers == binding.Modifiers);
+                var existingBinding = _presetHotkeys.FirstOrDefault(
+                    item => item.Hotkey.Key == binding.Key && item.Hotkey.Modifiers == binding.Modifiers);
                 var updated = new PresetHotkeyBinding
                 {
                     Hotkey = binding,
