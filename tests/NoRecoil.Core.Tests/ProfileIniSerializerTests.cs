@@ -123,13 +123,14 @@ public class ProfileIniSerializerTests
     [Fact]
     public void Parse_LimitsPresetHotkeysToMax()
     {
+        const int excessivePresetHotkeyCount = ProfileSettings.MaxPresetHotkeys + 5;
         var lines = new List<string>
         {
             "[Profile]",
             "Right=1",
         };
 
-        for (var i = 1; i <= 25; i++)
+        for (var i = 1; i <= excessivePresetHotkeyCount; i++)
         {
             lines.Add($"PresetHotkey{i}=Ctrl+{80 + i}|C:\\presets\\preset{i}.ini");
         }
@@ -144,7 +145,8 @@ public class ProfileIniSerializerTests
     [Fact]
     public void Serialize_LimitsPresetHotkeysToMax()
     {
-        var presetHotkeys = Enumerable.Range(1, 25)
+        const int excessivePresetHotkeyCount = ProfileSettings.MaxPresetHotkeys + 5;
+        var presetHotkeys = Enumerable.Range(1, excessivePresetHotkeyCount)
             .Select(i => new PresetHotkeyBinding
             {
                 Hotkey = new HotkeyBinding

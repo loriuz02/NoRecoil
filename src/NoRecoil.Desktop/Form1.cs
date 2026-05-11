@@ -652,9 +652,9 @@ public partial class Form1 : Form
     private void RefreshPresetHotkeyList()
     {
         _presetHotkeysList.Items.Clear();
-        foreach (var item in _presetHotkeys.OrderBy(item => item.Hotkey.Modifiers).ThenBy(item => item.Hotkey.Key))
+        foreach (var presetHotkey in _presetHotkeys.OrderBy(hotkey => hotkey.Hotkey.Modifiers).ThenBy(hotkey => hotkey.Hotkey.Key))
         {
-            _presetHotkeysList.Items.Add(item);
+            _presetHotkeysList.Items.Add(presetHotkey);
         }
     }
 
@@ -746,6 +746,7 @@ public partial class Form1 : Form
     private const int VK_MENU = 0x12;
     private const int MinSupportedVirtualKey = 0x01; // Lowest Windows virtual-key code used by GetAsyncKeyState.
     private const int MaxSupportedVirtualKey = 0xFE; // Upper bound supported here; 0xFE (VK_PACKET) and 0xFF have special meanings.
+    private static readonly Color AccentBorderColor = Color.FromArgb(80, 120, 191);
 
     [DllImport("user32.dll")]
     private static extern short GetAsyncKeyState(int vKey);
@@ -926,7 +927,7 @@ public partial class Form1 : Form
             {
                 case Button button:
                     button.FlatStyle = FlatStyle.Flat;
-                    button.FlatAppearance.BorderColor = Color.FromArgb(80, 120, 191);
+                    button.FlatAppearance.BorderColor = AccentBorderColor;
                     button.FlatAppearance.MouseOverBackColor = Color.FromArgb(42, 52, 76);
                     button.BackColor = Color.FromArgb(31, 38, 55);
                     button.ForeColor = Color.Gainsboro;
@@ -999,7 +1000,7 @@ public partial class Form1 : Form
                 BackColor = Color.FromArgb(31, 38, 55),
                 ForeColor = Color.Gainsboro,
             };
-            cancelButton.FlatAppearance.BorderColor = Color.FromArgb(80, 120, 191);
+            cancelButton.FlatAppearance.BorderColor = AccentBorderColor;
 
             Controls.Add(promptLabel);
             Controls.Add(waitingLabel);
