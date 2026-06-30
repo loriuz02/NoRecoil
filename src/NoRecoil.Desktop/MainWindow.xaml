@@ -119,7 +119,7 @@
                                         <WrapPanel Margin="0,0,0,6">
                                             <Button Name="SavePresetButton" Style="{StaticResource PrimaryButtonStyle}" Content="Save preset" Click="SaveButton_Click"/>
                                             <Button Name="LoadPresetButton" Content="Load preset" Click="LoadButton_Click"/>
-                                            <Button Name="ToggleRecoilButton" Content="Enable recoil" Click="ToggleRecoilButton_Click"/>
+                                            <Button Name="ToggleRecoilButton" Content="Enable recoil" Padding="32,10" Click="ToggleRecoilButton_Click"/>
                                         </WrapPanel>
                                         <CheckBox Name="RequireRightMouseCheckBox" Content="Require right mouse together with left" Checked="RequireRightMouseCheckbox_Changed" Unchecked="RequireRightMouseCheckbox_Changed"/>
 
@@ -137,6 +137,7 @@
                                             <Button Name="LoadSecondaryPresetButton"
                                                     Grid.Column="1"
                                                     Margin="10,0,0,0"
+                                                    Padding="32,10"
                                                     Content="Load secondary preset"
                                                     Visibility="Collapsed"
                                                     Click="LoadSecondaryPresetButton_Click"/>

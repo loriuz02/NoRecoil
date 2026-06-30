@@ -472,6 +472,11 @@ public partial class MainWindow : Window
             SecondaryPresetCheckBox.IsChecked = true;
             SetSecondaryPreset(file.Secondary, Path.GetFileName(path));
         }
+        else
+        {
+            SecondaryPresetCheckBox.IsChecked = false;
+            ClearSecondaryPreset();
+        }
     }
 
     private void SetSecondaryPreset(RecoilPreset preset, string source)
