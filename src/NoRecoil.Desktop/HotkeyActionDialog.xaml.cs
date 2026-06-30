@@ -77,8 +77,9 @@ public partial class HotkeyActionDialog : Window
         return action switch
         {
             MainWindow.HotkeyAction.PresetSelection => "Preset selection",
-            MainWindow.HotkeyAction.EnableRecoil => "Enable recoil",
-            MainWindow.HotkeyAction.DisableRecoil => "Disable recoil",
+            MainWindow.HotkeyAction.EnableRecoil => "Enable / Primary recoil",
+            MainWindow.HotkeyAction.DisableRecoil => "Disable / Secondary recoil",
+            MainWindow.HotkeyAction.ForceDisableRecoil => "Force disable recoil",
             MainWindow.HotkeyAction.ToggleRecoil => "Toggle recoil",
             MainWindow.HotkeyAction.IncreaseDown => "Increase down value",
             MainWindow.HotkeyAction.DecreaseDown => "Decrease down value",
