@@ -9,6 +9,10 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <UseAppHost>true</UseAppHost>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <AssemblyName>Loriuz NoRecoil</AssemblyName>
+    <AssemblyTitle>Loriuz NoRecoil</AssemblyTitle>
+    <Product>Loriuz NoRecoil</Product>
+    <ApplicationIcon>..\assets\Loriuz NoRecoil.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>

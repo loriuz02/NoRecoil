@@ -18,6 +18,7 @@ Delay=0
 ```
 
 - Recoil control buttons (toggle + disable)
+- Optional **secondary preset** system: enable "Switch to secondary preset when toggled off" to load a second recoil, switch between "Recoil 1"/"Recoil 2" with the toggle, and save both in one `[Recoil]`/`[Secondary]` INI file
 - Trigger mode switch: default **LMB + RMB** required, or **LMB only**
 - Recoil control that moves the mouse while configured trigger is pressed (using `Right-Left` and `Down-Up`)
 - Bluetooth serial sync support (COM port)

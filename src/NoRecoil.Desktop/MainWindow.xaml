@@ -4,7 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="NoRecoil Controller"
+        Title="Loriuz NoRecoil"
         Width="630"
         Height="760"
         MinWidth="570"
@@ -123,6 +123,25 @@
                                         </WrapPanel>
                                         <CheckBox Name="RequireRightMouseCheckBox" Content="Require right mouse together with left" Checked="RequireRightMouseCheckbox_Changed" Unchecked="RequireRightMouseCheckbox_Changed"/>
 
+                                        <Grid Margin="0,8,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <CheckBox Name="SecondaryPresetCheckBox"
+                                                      Grid.Column="0"
+                                                      VerticalAlignment="Center"
+                                                      Content="Switch to secondary preset when toggled off"
+                                                      Checked="SecondaryPresetCheckBox_Changed"
+                                                      Unchecked="SecondaryPresetCheckBox_Changed"/>
+                                            <Button Name="LoadSecondaryPresetButton"
+                                                    Grid.Column="1"
+                                                    Margin="10,0,0,0"
+                                                    Content="Load secondary preset"
+                                                    Visibility="Collapsed"
+                                                    Click="LoadSecondaryPresetButton_Click"/>
+                                        </Grid>
+
                                         <Grid Margin="0,16,0,0">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="140"/>
@@ -130,6 +149,15 @@
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" Text="Recoil status"/>
                                             <TextBlock Name="RecoilStatusText" Grid.Column="1" FontWeight="SemiBold" Text="Disabled"/>
+                                        </Grid>
+
+                                        <Grid Name="SecondaryPresetRow" Margin="0,10,0,0" Visibility="Collapsed">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="140"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" Text="Secondary preset"/>
+                                            <TextBlock Name="SecondaryPresetText" Grid.Column="1" FontWeight="SemiBold" Text="-" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
                                         </Grid>
 
                                         <Grid Margin="0,10,0,0">

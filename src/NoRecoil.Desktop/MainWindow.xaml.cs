@@ -33,6 +33,9 @@ public partial class MainWindow : Window
     private SerialPort? _serialPort;
     private bool _isInitializing;
     private bool _applyingProfile;
+    private RecoilMode _recoilMode = RecoilMode.Disabled;
+    private RecoilPreset? _secondaryPreset;
+    private string _secondaryPresetDescription = string.Empty;
 
     public MainWindow()
     {
@@ -57,6 +60,8 @@ public partial class MainWindow : Window
             ApplyPreset(new RecoilPreset());
             ApplyRecoilState(false);
             RequireRightMouseCheckBox.IsChecked = true;
+            SecondaryPresetCheckBox.IsChecked = false;
+            UpdateSecondaryUi();
             BluetoothPortTextBox.Text = "COM5";
 
             EnsureDefaultHotkeys();
@@ -67,7 +72,7 @@ public partial class MainWindow : Window
             if (!string.IsNullOrWhiteSpace(lastPath) && File.Exists(lastPath))
             {
                 var resolvedPath = lastPath.Trim();
-                ApplyPreset(PresetIniSerializer.LoadFromFile(resolvedPath));
+                LoadPresetFile(resolvedPath);
                 LastPathText.Text = resolvedPath;
             }
 
@@ -142,7 +147,45 @@ public partial class MainWindow : Window
 
     private void ToggleRecoilButton_Click(object sender, RoutedEventArgs e)
     {
-        ApplyRecoilState(!_recoilTimer.IsEnabled);
+        ToggleRecoil();
+        SaveProfile();
+    }
+
+    private void SecondaryPresetCheckBox_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!CanUseSecondary && _recoilMode == RecoilMode.Secondary)
+        {
+            SetRecoilMode(RecoilMode.Primary);
+        }
+
+        UpdateSecondaryUi();
+        SaveProfile();
+    }
+
+    private void LoadSecondaryPresetButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_secondaryPreset is not null)
+        {
+            ClearSecondaryPreset();
+            return;
+        }
+
+        var dialog = new OpenFileDialog
+        {
+            Filter = "INI files (*.ini)|*.ini|All files (*.*)|*.*",
+            DefaultExt = "ini",
+            CheckFileExists = true,
+        };
+
+        SetInitialDirectory(dialog);
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        var file = PresetIniSerializer.LoadFileFromFile(dialog.FileName);
+        var secondary = file.Secondary ?? file.Primary;
+        SetSecondaryPreset(secondary, Path.GetFileName(dialog.FileName));
         SaveProfile();
     }
 
@@ -188,7 +231,16 @@ public partial class MainWindow : Window
             return;
         }
 
-        PresetIniSerializer.SaveToFile(dialog.FileName, BuildPreset(), includeSectionHeader: true);
+        var primary = BuildPreset();
+        if (CanUseSecondary)
+        {
+            PresetIniSerializer.SaveToFile(dialog.FileName, new RecoilPresetFile(primary, _secondaryPreset));
+        }
+        else
+        {
+            PresetIniSerializer.SaveToFile(dialog.FileName, primary, includeSectionHeader: true);
+        }
+
         _lastPathCache.Save(dialog.FileName);
         LastPathText.Text = dialog.FileName;
         SaveProfile();
@@ -209,8 +261,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var preset = PresetIniSerializer.LoadFromFile(dialog.FileName);
-        ApplyPreset(preset);
+        LoadPresetFile(dialog.FileName);
 
         _lastPathCache.Save(dialog.FileName);
         LastPathText.Text = dialog.FileName;
@@ -266,7 +317,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var preset = BuildPreset();
+        var preset = GetActivePreset();
         if (preset.HorizontalDelta == 0 && preset.VerticalDelta == 0)
         {
             return;
@@ -334,10 +385,134 @@ public partial class MainWindow : Window
 
     private void ApplyRecoilState(bool enabled)
     {
-        _recoilTimer.IsEnabled = enabled;
-        RecoilStatusText.Text = enabled ? "Enabled" : "Disabled";
+        SetRecoilMode(enabled ? RecoilMode.Primary : RecoilMode.Disabled);
+    }
+
+    private bool CanUseSecondary => SecondaryPresetCheckBox.IsChecked == true && _secondaryPreset is not null;
+
+    private RecoilPreset GetActivePreset()
+    {
+        return _recoilMode == RecoilMode.Secondary && _secondaryPreset is not null
+            ? _secondaryPreset
+            : BuildPreset();
+    }
+
+    private void SetRecoilMode(RecoilMode mode)
+    {
+        if (mode == RecoilMode.Secondary && _secondaryPreset is null)
+        {
+            mode = RecoilMode.Primary;
+        }
+
+        _recoilMode = mode;
+        _recoilTimer.IsEnabled = mode != RecoilMode.Disabled;
+        UpdateRecoilStatus();
+    }
+
+    private void ToggleRecoil()
+    {
+        if (CanUseSecondary)
+        {
+            var next = _recoilMode switch
+            {
+                RecoilMode.Disabled => RecoilMode.Primary,
+                RecoilMode.Primary => RecoilMode.Secondary,
+                _ => RecoilMode.Disabled,
+            };
+            SetRecoilMode(next);
+            return;
+        }
+
+        SetRecoilMode(_recoilMode == RecoilMode.Disabled ? RecoilMode.Primary : RecoilMode.Disabled);
+    }
+
+    private void UpdateRecoilStatus()
+    {
+        var enabled = _recoilMode != RecoilMode.Disabled;
+        var secondaryMode = SecondaryPresetCheckBox.IsChecked == true;
+
+        if (secondaryMode)
+        {
+            RecoilStatusText.Text = _recoilMode switch
+            {
+                RecoilMode.Primary => "Recoil 1",
+                RecoilMode.Secondary => "Recoil 2",
+                _ => "Disabled",
+            };
+        }
+        else
+        {
+            RecoilStatusText.Text = enabled ? "Enabled" : "Disabled";
+        }
+
         RecoilStatusText.Foreground = (Brush)FindResource(enabled ? "SuccessBrush" : "DangerBrush");
-        ToggleRecoilButton.Content = enabled ? "Disable recoil" : "Enable recoil";
+
+        if (CanUseSecondary)
+        {
+            ToggleRecoilButton.Content = _recoilMode switch
+            {
+                RecoilMode.Disabled => "Enable recoil",
+                RecoilMode.Primary => "Switch to Recoil 2",
+                _ => "Disable recoil",
+            };
+        }
+        else
+        {
+            ToggleRecoilButton.Content = enabled ? "Disable recoil" : "Enable recoil";
+        }
+    }
+
+    private void LoadPresetFile(string path)
+    {
+        var file = PresetIniSerializer.LoadFileFromFile(path);
+        ApplyPreset(file.Primary);
+
+        if (file.Secondary is not null)
+        {
+            SecondaryPresetCheckBox.IsChecked = true;
+            SetSecondaryPreset(file.Secondary, Path.GetFileName(path));
+        }
+    }
+
+    private void SetSecondaryPreset(RecoilPreset preset, string source)
+    {
+        _secondaryPreset = preset;
+        _secondaryPresetDescription = string.IsNullOrWhiteSpace(source)
+            ? FormatPresetSummary(preset)
+            : $"{source} ({FormatPresetSummary(preset)})";
+        UpdateSecondaryUi();
+    }
+
+    private void ClearSecondaryPreset()
+    {
+        _secondaryPreset = null;
+        _secondaryPresetDescription = string.Empty;
+
+        if (_recoilMode == RecoilMode.Secondary)
+        {
+            SetRecoilMode(RecoilMode.Primary);
+        }
+
+        UpdateSecondaryUi();
+        SaveProfile();
+    }
+
+    private void UpdateSecondaryUi()
+    {
+        var secondaryMode = SecondaryPresetCheckBox.IsChecked == true;
+        var hasSecondary = _secondaryPreset is not null;
+
+        LoadSecondaryPresetButton.Visibility = secondaryMode ? Visibility.Visible : Visibility.Collapsed;
+        SecondaryPresetRow.Visibility = secondaryMode ? Visibility.Visible : Visibility.Collapsed;
+        LoadSecondaryPresetButton.Content = hasSecondary ? "Delete" : "Load secondary preset";
+        SecondaryPresetText.Text = hasSecondary ? _secondaryPresetDescription : "-";
+
+        UpdateRecoilStatus();
+    }
+
+    private static string FormatPresetSummary(RecoilPreset preset)
+    {
+        return $"R:{preset.Right} D:{preset.Down} L:{preset.Left} U:{preset.Up} Delay:{preset.Delay}";
     }
 
     private ProfileSettings BuildProfileSettings() => new()
@@ -758,31 +933,46 @@ public partial class MainWindow : Window
                     return;
                 }
 
-                var preset = PresetIniSerializer.LoadFromFile(hotkeyBinding.PresetPath);
-                ApplyPreset(preset);
+                LoadPresetFile(hotkeyBinding.PresetPath);
                 _lastPathCache.Save(hotkeyBinding.PresetPath);
                 LastPathText.Text = hotkeyBinding.PresetPath;
                 TrySendPresetToBluetooth();
                 SaveProfile();
                 break;
             case HotkeyAction.EnableRecoil:
-                if (!_recoilTimer.IsEnabled)
+                if (_recoilMode != RecoilMode.Primary)
                 {
-                    ApplyRecoilState(true);
+                    SetRecoilMode(RecoilMode.Primary);
                     SaveProfile();
                 }
 
                 break;
             case HotkeyAction.DisableRecoil:
-                if (_recoilTimer.IsEnabled)
+                if (CanUseSecondary)
                 {
-                    ApplyRecoilState(false);
+                    if (_recoilMode != RecoilMode.Secondary)
+                    {
+                        SetRecoilMode(RecoilMode.Secondary);
+                        SaveProfile();
+                    }
+                }
+                else if (_recoilMode != RecoilMode.Disabled)
+                {
+                    SetRecoilMode(RecoilMode.Disabled);
+                    SaveProfile();
+                }
+
+                break;
+            case HotkeyAction.ForceDisableRecoil:
+                if (_recoilMode != RecoilMode.Disabled)
+                {
+                    SetRecoilMode(RecoilMode.Disabled);
                     SaveProfile();
                 }
 
                 break;
             case HotkeyAction.ToggleRecoil:
-                ApplyRecoilState(!_recoilTimer.IsEnabled);
+                ToggleRecoil();
                 SaveProfile();
                 break;
             case HotkeyAction.IncreaseDown:
@@ -853,8 +1043,9 @@ public partial class MainWindow : Window
         return action switch
         {
             HotkeyAction.PresetSelection => "Preset selection",
-            HotkeyAction.EnableRecoil => "Enable recoil",
-            HotkeyAction.DisableRecoil => "Disable recoil",
+            HotkeyAction.EnableRecoil => "Enable / Primary recoil",
+            HotkeyAction.DisableRecoil => "Disable / Secondary recoil",
+            HotkeyAction.ForceDisableRecoil => "Force disable recoil",
             HotkeyAction.ToggleRecoil => "Toggle recoil",
             HotkeyAction.IncreaseDown => "Increase down value",
             HotkeyAction.DecreaseDown => "Decrease down value",
@@ -1008,6 +1199,7 @@ public partial class MainWindow : Window
         PresetSelection,
         EnableRecoil,
         DisableRecoil,
+        ForceDisableRecoil,
         ToggleRecoil,
         IncreaseDown,
         DecreaseDown,
@@ -1017,6 +1209,13 @@ public partial class MainWindow : Window
         DecreaseRight,
         IncreaseLeft,
         DecreaseLeft,
+    }
+
+    internal enum RecoilMode
+    {
+        Disabled,
+        Primary,
+        Secondary,
     }
 
     internal sealed class RuntimeHotkeyBinding

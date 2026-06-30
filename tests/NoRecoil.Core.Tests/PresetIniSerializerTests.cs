@@ -106,4 +106,68 @@ public class PresetIniSerializerTests
         Assert.Contains("Up=0", ini);
         Assert.Contains("Delay=2", ini);
     }
+
+    [Fact]
+    public void ParseFile_ReadsPrimaryAndSecondarySections()
+    {
+        const string input = """
+            [Recoil]
+            Right=0
+            Down=58
+            Left=1
+            Up=0
+            Delay=0
+            [Secondary]
+            Right=0
+            Down=26
+            Left=0
+            Up=0
+            Delay=0
+            """;
+
+        var file = PresetIniSerializer.ParseFile(input);
+
+        Assert.True(file.HasSecondary);
+        Assert.Equal(58, file.Primary.Down);
+        Assert.Equal(1, file.Primary.Left);
+        Assert.NotNull(file.Secondary);
+        Assert.Equal(26, file.Secondary!.Down);
+    }
+
+    [Fact]
+    public void ParseFile_WithoutSecondarySectionHasNoSecondary()
+    {
+        const string input = """
+            [Recoil]
+            Right=0
+            Down=37
+            Left=0
+            Up=0
+            Delay=0
+            """;
+
+        var file = PresetIniSerializer.ParseFile(input);
+
+        Assert.False(file.HasSecondary);
+        Assert.Null(file.Secondary);
+        Assert.Equal(37, file.Primary.Down);
+    }
+
+    [Fact]
+    public void Serialize_PresetFile_WritesSecondarySection()
+    {
+        var file = new RecoilPresetFile(
+            new RecoilPreset { Down = 58 },
+            new RecoilPreset { Down = 26 });
+
+        var ini = PresetIniSerializer.Serialize(file);
+
+        Assert.Contains("[Recoil]", ini);
+        Assert.Contains("[Secondary]", ini);
+        Assert.True(ini.IndexOf("[Recoil]", StringComparison.Ordinal) < ini.IndexOf("[Secondary]", StringComparison.Ordinal));
+
+        var roundTrip = PresetIniSerializer.ParseFile(ini);
+        Assert.Equal(58, roundTrip.Primary.Down);
+        Assert.Equal(26, roundTrip.Secondary!.Down);
+    }
 }

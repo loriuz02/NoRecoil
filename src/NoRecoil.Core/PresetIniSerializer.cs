@@ -22,14 +22,7 @@ public static class PresetIniSerializer
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(content);
 
-        var values = new Dictionary<string, int>(KeyComparer)
-        {
-            ["Right"] = 0,
-            ["Down"] = 0,
-            ["Left"] = 0,
-            ["Up"] = 0,
-            ["Delay"] = 0,
-        };
+        var values = CreateDefaultValueMap();
 
         foreach (var rawLine in content.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
@@ -38,46 +31,95 @@ public static class PresetIniSerializer
                 continue;
             }
 
-            var separator = rawLine.IndexOf('=');
-            if (separator <= 0)
-            {
-                separator = rawLine.IndexOf(':');
-            }
+            ApplyLine(values, rawLine);
+        }
 
-            if (separator <= 0 || separator == rawLine.Length - 1)
+        return BuildPreset(values);
+    }
+
+    public static RecoilPresetFile ParseFile(string content)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(content);
+
+        var primary = CreateDefaultValueMap();
+        var secondary = CreateDefaultValueMap();
+        var inSecondary = false;
+        var hasSecondary = false;
+
+        foreach (var rawLine in content.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (rawLine.StartsWith(';') || rawLine.StartsWith('#'))
             {
                 continue;
             }
 
-            var key = ResolveKey(rawLine[..separator].Trim());
-            if (key is null || !values.ContainsKey(key))
+            if (rawLine.StartsWith('['))
             {
-                continue;
-            }
-
-            var valueText = rawLine[(separator + 1)..].Trim();
-            if (int.TryParse(valueText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value))
-            {
-                if (key.Equals("Delay", StringComparison.OrdinalIgnoreCase))
+                var header = rawLine.Trim('[', ']').Trim();
+                if (header.Equals("Secondary", StringComparison.OrdinalIgnoreCase))
                 {
-                    values[key] = value;
+                    inSecondary = true;
+                    hasSecondary = true;
                 }
                 else
                 {
-                    values[key] = NumericValueNormalizer.ToAbsolute(value);
+                    inSecondary = false;
                 }
+
+                continue;
             }
+
+            ApplyLine(inSecondary ? secondary : primary, rawLine);
         }
 
-        return new RecoilPreset
-        {
-            Right = values["Right"],
-            Down = values["Down"],
-            Left = values["Left"],
-            Up = values["Up"],
-            Delay = values["Delay"],
-        };
+        return new RecoilPresetFile(BuildPreset(primary), hasSecondary ? BuildPreset(secondary) : null);
     }
+
+    private static Dictionary<string, int> CreateDefaultValueMap() => new(KeyComparer)
+    {
+        ["Right"] = 0,
+        ["Down"] = 0,
+        ["Left"] = 0,
+        ["Up"] = 0,
+        ["Delay"] = 0,
+    };
+
+    private static void ApplyLine(IDictionary<string, int> values, string rawLine)
+    {
+        var separator = rawLine.IndexOf('=');
+        if (separator <= 0)
+        {
+            separator = rawLine.IndexOf(':');
+        }
+
+        if (separator <= 0 || separator == rawLine.Length - 1)
+        {
+            return;
+        }
+
+        var key = ResolveKey(rawLine[..separator].Trim());
+        if (key is null || !values.ContainsKey(key))
+        {
+            return;
+        }
+
+        var valueText = rawLine[(separator + 1)..].Trim();
+        if (int.TryParse(valueText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value))
+        {
+            values[key] = key.Equals("Delay", StringComparison.OrdinalIgnoreCase)
+                ? value
+                : NumericValueNormalizer.ToAbsolute(value);
+        }
+    }
+
+    private static RecoilPreset BuildPreset(IReadOnlyDictionary<string, int> values) => new()
+    {
+        Right = values["Right"],
+        Down = values["Down"],
+        Left = values["Left"],
+        Up = values["Up"],
+        Delay = values["Delay"],
+    };
 
     public static string Serialize(RecoilPreset preset, bool includeSectionHeader = true)
     {
@@ -99,10 +141,32 @@ public static class PresetIniSerializer
         return output.ToString();
     }
 
+    public static string Serialize(RecoilPresetFile file)
+    {
+        ArgumentNullException.ThrowIfNull(file);
+
+        var output = new StringBuilder();
+        output.Append(Serialize(file.Primary, includeSectionHeader: true));
+
+        if (file.Secondary is not null)
+        {
+            output.AppendLine("[Secondary]");
+            output.Append(Serialize(file.Secondary, includeSectionHeader: false));
+        }
+
+        return output.ToString();
+    }
+
     public static RecoilPreset LoadFromFile(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         return Parse(File.ReadAllText(path));
+    }
+
+    public static RecoilPresetFile LoadFileFromFile(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        return ParseFile(File.ReadAllText(path));
     }
 
     public static void SaveToFile(string path, RecoilPreset preset, bool includeSectionHeader = true)
@@ -111,6 +175,14 @@ public static class PresetIniSerializer
         ArgumentNullException.ThrowIfNull(preset);
 
         File.WriteAllText(path, Serialize(preset, includeSectionHeader));
+    }
+
+    public static void SaveToFile(string path, RecoilPresetFile file)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        ArgumentNullException.ThrowIfNull(file);
+
+        File.WriteAllText(path, Serialize(file));
     }
 
     private static string? ResolveKey(string rawKey)
