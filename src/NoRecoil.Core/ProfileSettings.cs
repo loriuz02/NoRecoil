@@ -10,6 +10,7 @@ public sealed class ProfileSettings
     public RecoilPreset Preset { get; init; } = new();
     public bool RecoilEnabled { get; init; }
     public bool RequireRightMouseButton { get; init; } = true;
+    public RecoilOutputBackend OutputBackend { get; init; } = RecoilOutputBackend.Mouse;
     public string BluetoothPort { get; init; } = string.Empty;
     public IReadOnlyList<PresetHotkeyBinding> Hotkeys { get; init; } = [];
 }

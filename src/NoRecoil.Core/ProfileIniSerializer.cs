@@ -22,6 +22,7 @@ public static class ProfileIniSerializer
             ["Delay"] = "0",
             ["RecoilEnabled"] = "false",
             ["RequireRightMouseButton"] = "true",
+            ["OutputBackend"] = nameof(RecoilOutputBackend.Mouse),
             ["BluetoothPort"] = string.Empty,
             ["EnableHotkey"] = string.Empty,
             ["DisableHotkey"] = string.Empty,
@@ -79,6 +80,7 @@ public static class ProfileIniSerializer
             },
             RecoilEnabled = ParseBoolOrDefault(values["RecoilEnabled"], defaultValue: false),
             RequireRightMouseButton = ParseBoolOrDefault(values["RequireRightMouseButton"], defaultValue: true),
+            OutputBackend = ParseOutputBackend(values["OutputBackend"]),
             BluetoothPort = values["BluetoothPort"],
             Hotkeys = parsedHotkeys,
         };
@@ -87,6 +89,10 @@ public static class ProfileIniSerializer
     public static string Serialize(ProfileSettings settings, bool includeSectionHeader = true)
     {
         ArgumentNullException.ThrowIfNull(settings);
+        if (!Enum.IsDefined(settings.OutputBackend))
+        {
+            throw new ArgumentOutOfRangeException(nameof(settings), "Unknown recoil output backend.");
+        }
 
         var output = new StringBuilder();
 
@@ -102,6 +108,7 @@ public static class ProfileIniSerializer
         output.AppendLine($"Delay={settings.Preset.Delay}");
         output.AppendLine($"RecoilEnabled={settings.RecoilEnabled}");
         output.AppendLine($"RequireRightMouseButton={settings.RequireRightMouseButton}");
+        output.AppendLine($"OutputBackend={settings.OutputBackend}");
         output.AppendLine($"BluetoothPort={settings.BluetoothPort}");
 
         var maxHotkeys = Math.Min(settings.Hotkeys.Count, ProfileSettings.MaxHotkeys);
@@ -137,6 +144,17 @@ public static class ProfileIniSerializer
     private static int ParseIntOrDefault(string valueText)
     {
         return int.TryParse(valueText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) ? value : 0;
+    }
+
+    private static RecoilOutputBackend ParseOutputBackend(string valueText)
+    {
+        if (Enum.TryParse<RecoilOutputBackend>(valueText, ignoreCase: true, out var backend)
+            && Enum.IsDefined(backend))
+        {
+            return backend;
+        }
+
+        throw new FormatException($"Unknown recoil output backend: '{valueText}'.");
     }
 
     private static int ParseAndNormalizeIntOrDefault(string valueText)

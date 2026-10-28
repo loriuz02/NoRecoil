@@ -15,6 +15,7 @@ namespace NoRecoil.Desktop;
 public partial class MainWindow : Window
 {
     private sealed record HotkeyActionOption(HotkeyAction Action, string Label);
+    private sealed record OutputBackendOption(RecoilOutputBackend Backend, string Label);
 
     private enum NavigationPage
     {
@@ -31,6 +32,7 @@ public partial class MainWindow : Window
     private readonly List<RuntimeHotkeyBinding> _hotkeys = [];
     private readonly List<HotkeyActionOption> _hotkeyActionOptions;
     private SerialPort? _serialPort;
+    private ViGEmGamepadOutput? _gamepadOutput;
     private bool _isInitializing;
     private bool _applyingProfile;
     private RecoilMode _recoilMode = RecoilMode.Disabled;
@@ -48,6 +50,13 @@ public partial class MainWindow : Window
                 .Select(action => new HotkeyActionOption(action, GetActionDisplayName(action)))
                 .ToList();
             InitializeHotkeyActionEditor();
+            OutputBackendComboBox.ItemsSource = new[]
+            {
+                new OutputBackendOption(RecoilOutputBackend.Mouse, "Mouse (Windows API)"),
+                new OutputBackendOption(RecoilOutputBackend.ViGEmXbox360, "Virtual Xbox 360 controller (ViGEmBus)"),
+            };
+            OutputBackendComboBox.SelectedValue = RecoilOutputBackend.Mouse;
+            UpdateOutputBackendHelp();
             SetActivePage(NavigationPage.Main);
 
             _recoilTimer.Interval = TimeSpan.FromMilliseconds(10);
@@ -194,6 +203,89 @@ public partial class MainWindow : Window
         SaveProfile();
     }
 
+    private RecoilOutputBackend SelectedOutputBackend =>
+        OutputBackendComboBox.SelectedValue is RecoilOutputBackend backend ? backend : RecoilOutputBackend.Mouse;
+
+    private void OutputBackendComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isInitializing || !IsLoaded || _applyingProfile)
+        {
+            return;
+        }
+
+        SetRecoilMode(RecoilMode.Disabled);
+        TryGamepadAction(DisconnectGamepad);
+        UpdateOutputBackendHelp();
+        SaveProfile();
+    }
+
+    private void UpdateOutputBackendHelp()
+    {
+        OutputBackendHelpText.Text = SelectedOutputBackend == RecoilOutputBackend.ViGEmXbox360
+            ? "Requires ViGEmBus installed separately. Outputs right-stick deflection, not mouse movement. "
+              + "Mouse buttons still trigger recoil; no controller buttons or physical inputs are forwarded. "
+              + "Changing output disables recoil. No anti-cheat compatibility guarantee."
+            : "Uses Windows mouse movement. Changing output disables recoil.";
+    }
+
+    private bool TryGamepadAction(Action action)
+    {
+        try
+        {
+            action();
+            return true;
+        }
+        catch (Exception ex) when (ViGEmGamepadOutput.IsDriverError(ex))
+        {
+            _recoilTimer.Stop();
+            _recoilMode = RecoilMode.Disabled;
+            UpdateRecoilStatus();
+            var message = $"{ex.GetType().Name}: {ex.Message}";
+            try
+            {
+                DisconnectGamepad();
+            }
+            catch (Exception cleanupError) when (ViGEmGamepadOutput.IsDriverError(cleanupError))
+            {
+                message += $"\nCleanup: {cleanupError.GetType().Name}: {cleanupError.Message}";
+            }
+
+            SaveProfile();
+            var wasPollingHotkeys = _hotkeyTimer.IsEnabled;
+            _hotkeyTimer.Stop();
+            try
+            {
+                var errorMessage = "Virtual controller output failed; recoil has been disabled. "
+                + "Check that the ViGEmBus driver is installed and available, then enable recoil to retry.\n\n"
+                + message;
+                if (IsVisible)
+                {
+                    MessageBox.Show(this, errorMessage, "NoRecoil", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                else
+                {
+                    MessageBox.Show(errorMessage, "NoRecoil", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            finally
+            {
+                if (wasPollingHotkeys)
+                {
+                    _hotkeyTimer.Start();
+                }
+            }
+
+            return false;
+        }
+    }
+
+    private void DisconnectGamepad()
+    {
+        var output = _gamepadOutput;
+        _gamepadOutput = null;
+        output?.Dispose();
+    }
+
     private void BluetoothPortTextBox_TextChanged(object sender, TextChangedEventArgs e)
     {
         SaveProfile();
@@ -309,21 +401,35 @@ public partial class MainWindow : Window
     {
         if ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) == 0)
         {
+            TryGamepadAction(() => _gamepadOutput?.Center());
             return;
         }
 
         if (RequireRightMouseCheckBox.IsChecked == true && (GetAsyncKeyState(VK_RBUTTON) & 0x8000) == 0)
         {
+            TryGamepadAction(() => _gamepadOutput?.Center());
             return;
         }
 
         var preset = GetActivePreset();
         if (preset.HorizontalDelta == 0 && preset.VerticalDelta == 0)
         {
+            TryGamepadAction(() => _gamepadOutput?.Center());
             return;
         }
 
-        mouse_event(MOUSEEVENTF_MOVE, preset.HorizontalDelta, preset.VerticalDelta, 0, 0);
+        if (SelectedOutputBackend == RecoilOutputBackend.ViGEmXbox360)
+        {
+            if (!TryGamepadAction(() =>
+                (_gamepadOutput ?? throw new InvalidOperationException("The virtual controller is not connected.")).Move(preset)))
+            {
+                return;
+            }
+        }
+        else
+        {
+            mouse_event(MOUSEEVENTF_MOVE, preset.HorizontalDelta, preset.VerticalDelta, 0, 0);
+        }
 
         var delay = Math.Max(preset.Delay, 0);
         _recoilTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(delay, 1));
@@ -402,6 +508,22 @@ public partial class MainWindow : Window
         if (mode == RecoilMode.Secondary && _secondaryPreset is null)
         {
             mode = RecoilMode.Primary;
+        }
+
+        if (!TryGamepadAction(() =>
+            {
+                if (mode == RecoilMode.Disabled)
+                {
+                    _gamepadOutput?.Center();
+                }
+                else if (SelectedOutputBackend == RecoilOutputBackend.ViGEmXbox360 && _gamepadOutput is null)
+                {
+                    _gamepadOutput = new ViGEmGamepadOutput();
+                    _gamepadOutput.Connect();
+                }
+            }))
+        {
+            return;
         }
 
         _recoilMode = mode;
@@ -525,6 +647,7 @@ public partial class MainWindow : Window
         Preset = BuildPreset(),
         RecoilEnabled = _recoilTimer.IsEnabled,
         RequireRightMouseButton = RequireRightMouseCheckBox.IsChecked == true,
+        OutputBackend = SelectedOutputBackend,
         BluetoothPort = BluetoothPortTextBox.Text.Trim(),
         Hotkeys = _hotkeys
             .Take(ProfileSettings.MaxHotkeys)
@@ -542,6 +665,8 @@ public partial class MainWindow : Window
         try
         {
             ApplyPreset(settings.Preset);
+            OutputBackendComboBox.SelectedValue = settings.OutputBackend;
+            UpdateOutputBackendHelp();
             ApplyRecoilState(settings.RecoilEnabled);
             RequireRightMouseCheckBox.IsChecked = settings.RequireRightMouseButton;
             BluetoothPortTextBox.Text = settings.BluetoothPort;
@@ -592,8 +717,10 @@ public partial class MainWindow : Window
 
             ApplyProfileSettings(ProfileIniSerializer.LoadFromFile(_profilePath));
         }
-        catch
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or FormatException or ArgumentException)
         {
+            SetRecoilMode(RecoilMode.Disabled);
+            MessageBox.Show(this, $"Could not load profile: {ex.Message}", "NoRecoil", MessageBoxButton.OK, MessageBoxImage.Error);
             SaveProfile();
         }
     }
@@ -723,6 +850,8 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _hotkeyTimer.Stop();
+        _recoilTimer.Stop();
+        TryGamepadAction(DisconnectGamepad);
         DisconnectBluetooth();
         base.OnClosed(e);
     }

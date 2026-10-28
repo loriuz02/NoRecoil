@@ -66,6 +66,7 @@ public class ProfileIniSerializerTests
         Assert.Equal(0, settings.Preset.Down);
         Assert.False(settings.RecoilEnabled);
         Assert.True(settings.RequireRightMouseButton);
+        Assert.Equal(RecoilOutputBackend.Mouse, settings.OutputBackend);
         Assert.Equal(string.Empty, settings.BluetoothPort);
         Assert.Empty(settings.Hotkeys);
     }
@@ -134,6 +135,41 @@ public class ProfileIniSerializerTests
         Assert.Contains(@"Hotkey3=Shift+56|C:\presets\ak.ini", ini);
         Assert.DoesNotContain("EnableHotkey=", ini);
         Assert.DoesNotContain("DisableHotkey=", ini);
+    }
+
+    [Theory]
+    [InlineData(RecoilOutputBackend.Mouse)]
+    [InlineData(RecoilOutputBackend.ViGEmXbox360)]
+    public void OutputBackend_RoundTrips(RecoilOutputBackend backend)
+    {
+        var ini = ProfileIniSerializer.Serialize(new ProfileSettings { OutputBackend = backend });
+
+        Assert.Contains($"OutputBackend={backend}", ini);
+        Assert.Equal(backend, ProfileIniSerializer.Parse(ini).OutputBackend);
+    }
+
+    [Fact]
+    public void Parse_OutputBackendIsCaseInsensitive()
+    {
+        var settings = ProfileIniSerializer.Parse("OutputBackend=vigemxbox360");
+
+        Assert.Equal(RecoilOutputBackend.ViGEmXbox360, settings.OutputBackend);
+    }
+
+    [Theory]
+    [InlineData("Unknown")]
+    [InlineData("42")]
+    [InlineData("")]
+    public void Parse_RejectsUnknownOutputBackend(string value)
+    {
+        Assert.Throws<FormatException>(() => ProfileIniSerializer.Parse($"OutputBackend={value}"));
+    }
+
+    [Fact]
+    public void Serialize_RejectsUnknownOutputBackend()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => ProfileIniSerializer.Serialize(
+            new ProfileSettings { OutputBackend = (RecoilOutputBackend)42 }));
     }
 
     [Fact]
