@@ -116,6 +116,14 @@
                                 <Border Style="{StaticResource CardBorderStyle}" Padding="22">
                                     <StackPanel TextElement.FontSize="16.8">
                                         <TextBlock Style="{StaticResource SectionTitleStyle}" FontSize="24" Text="Controls"/>
+                                        <TextBlock Text="Output backend" Margin="0,0,0,6"/>
+                                        <ComboBox Name="OutputBackendComboBox"
+                                                  DisplayMemberPath="Label"
+                                                  SelectedValuePath="Backend"
+                                                  SelectionChanged="OutputBackendComboBox_SelectionChanged"/>
+                                        <TextBlock Name="OutputBackendHelpText" Margin="0,6,0,10"
+                                                   Foreground="{StaticResource TextMutedBrush}"
+                                                   TextWrapping="Wrap"/>
                                         <WrapPanel Margin="0,0,0,6">
                                             <Button Name="SavePresetButton" Style="{StaticResource PrimaryButtonStyle}" Content="Save preset" Click="SaveButton_Click"/>
                                             <Button Name="LoadPresetButton" Content="Load preset" Click="LoadButton_Click"/>
